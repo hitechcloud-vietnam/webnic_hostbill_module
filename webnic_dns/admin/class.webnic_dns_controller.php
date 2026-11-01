@@ -18,6 +18,12 @@
  *                              auto-renew/unsubscribe, partner-subscription and
  *                              URL/email forwarding tools.
  * All mutating actions are dispatched through handleWebnicAction() on POST.
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 require_once APPDIR_LIBS . "dnsfunctions" . DS . "class.dnstemplates_controller.php";
 #[\AllowDynamicProperties]

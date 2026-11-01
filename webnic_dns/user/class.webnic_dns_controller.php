@@ -10,6 +10,12 @@
  * Adds a client-facing URL/email forwarding panel so a service owner can manage
  * forwarding on their own zones (the full forwarding surface is also exposed
  * through the User API routes beside this module).
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 require_once APPDIR_LIBS . "dnsfunctions" . DS . "class.dnscontroller.php";
 #[\AllowDynamicProperties]

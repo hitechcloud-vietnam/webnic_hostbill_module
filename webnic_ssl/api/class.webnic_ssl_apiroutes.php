@@ -14,6 +14,12 @@
  * surface stays safe for self-service: certificate status/download, DCV details
  * and DCV self-service (change method, resend approver, CSR generate/decode).
  * No cancel/terminate is exposed here.
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 
 if (!defined('MAINDIR')) {

@@ -19,7 +19,11 @@
  * This module is self-contained under webnic_domain/ and does NOT reference
  * any other WebNIC module at runtime.
  *
- * @package Domain\webnic_domain
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.2026-11-02.2
  */
 
 use Domain\webnic_domain\ORM\ORM_domcontacts as DContacts;
@@ -2616,6 +2620,214 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
         $jobOrderId = is_string($resp['data'] ?? null) ? $resp['data'] : ($resp['data']['id'] ?? '');
         $this->addInfo('Bulk contact replacement submitted. Job Order ID: ' . $jobOrderId);
         return $jobOrderId;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  TRANSFER-IN STATUS  +  RESELLER-TRANSFER SUBMIT
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Submit a reseller transfer (gaining/losing reseller handover).
+     * POST domain/v2/reseller-transfer  {domainName, registrantUserId, domainType?}
+     * Distinct from the reseller transfer-away status approval endpoints.
+     * @param string      $domainName
+     * @param string|null $registrantUserId defaults to the configured registrant.
+     * @param string      $domainType       standard|premium
+     * @return array|false data on success.
+     */
+    public function submitResellerTransfer($domainName, $registrantUserId = null, $domainType = 'standard')
+    {
+        $domainName = trim((string) $domainName);
+        if ($domainName === '') {
+            $this->addError('Domain name is required.');
+            return false;
+        }
+        $params = [
+            'domainName'       => $domainName,
+            'registrantUserId' => (string) ($registrantUserId ?? $this->configuration['registrant_user_id']['value']),
+            'domainType'       => $domainType === 'premium' ? 'premium' : 'standard',
+        ];
+        $resp = $this->postApi('domain/v2/reseller-transfer', $params);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->addInfo('Reseller transfer submitted for ' . $domainName);
+        return $resp['data'] ?? [];
+    }
+
+    /**
+     * Get registrar transfer-IN status by domain name.
+     * GET domain/v2/transfer-in/status?domainName=...
+     * @param string $domainName
+     * @return array|false
+     */
+    public function getTransferInStatus($domainName)
+    {
+        $resp = $this->getApi('domain/v2/transfer-in/status?domainName=' . urlencode((string) $domainName));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Get registrar transfer-IN status by record id.
+     * GET domain/v2/transfer-in/status/{id}
+     * @param string|int $id
+     * @return array|false
+     */
+    public function getTransferInStatusById($id)
+    {
+        $resp = $this->getApi('domain/v2/transfer-in/status/' . urlencode((string) $id));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  REGISTRY SUSPEND  +  PROXY (PRIVACY) SUBSCRIPTION
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Registry-level suspend (clientHold) at WebNIC.
+     * POST domain/v2/suspend?domainName=...
+     * Distinct from Suspended(), which swaps to hold nameservers locally.
+     * @param string $domainName
+     * @return bool
+     */
+    public function domainSuspend($domainName)
+    {
+        $domainName = trim((string) $domainName);
+        if ($domainName === '') {
+            $this->addError('Domain name is required.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/suspend?domainName=' . urlencode($domainName));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->logAction(['action' => 'Registry Suspend', 'change' => $domainName]);
+        $this->addInfo('Domain suspended at registry: ' . $domainName);
+        return true;
+    }
+
+    /**
+     * Registry suspend status.
+     * GET domain/v2/suspendStatus?domainName=...
+     * @param string $domainName
+     * @return bool|null true=suspended, false=active, null on failure.
+     */
+    public function getDomainSuspendStatus($domainName)
+    {
+        $resp = $this->getApi('domain/v2/suspendStatus?domainName=' . urlencode((string) $domainName));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return null;
+        }
+        return (string) ($resp['data']['suspend'] ?? '') === 'true';
+    }
+
+    /**
+     * Toggle the annual WebNIC proxy (privacy) service subscription.
+     * PUT domain/v2/proxy  {action: subscribe|unsubscribe, domainName}
+     * Distinct from updateIDProtection() (WHOIS privacy toggle).
+     * @param string $domainName
+     * @param bool   $subscribe
+     * @return bool
+     */
+    public function toggleProxyService($domainName, $subscribe = true)
+    {
+        $domainName = trim((string) $domainName);
+        if ($domainName === '') {
+            $this->addError('Domain name is required.');
+            return false;
+        }
+        $resp = $this->putApi('domain/v2/proxy', [
+            'action'     => $subscribe ? 'subscribe' : 'unsubscribe',
+            'domainName' => $domainName,
+        ]);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->logAction(['action' => 'Toggle Proxy Service', 'change' => ($subscribe ? 'subscribe' : 'unsubscribe') . ' ' . $domainName]);
+        $this->addInfo('Proxy service ' . ($subscribe ? 'subscribed' : 'unsubscribed') . ': ' . $domainName);
+        return true;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  LOOKUP / RULES HELPERS
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Availability of a nameserver/host for a given extension.
+     * POST domain/v2/host/check?nameserver=...&ext=...
+     * @param string $nameserver
+     * @param string $ext        TLD extension (e.g. "com").
+     * @return array|false
+     */
+    public function checkHost($nameserver, $ext)
+    {
+        $nameserver = trim((string) $nameserver);
+        $ext        = ltrim(trim((string) $ext), '.');
+        if ($nameserver === '' || $ext === '') {
+            $this->addError('Both nameserver and extension are required.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/host/check?nameserver=' . urlencode($nameserver) . '&ext=' . urlencode($ext));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Smart availability query: a domain plus suggested alternate TLDs.
+     * GET domain/v2/smart-query?domainName=...&sortBy=...
+     * @param string $domainName
+     * @param string $sortBy     optional comma-separated TLD priority list.
+     * @return array resultList (empty on none/failure).
+     */
+    public function smartQuery($domainName, $sortBy = '')
+    {
+        $url = 'domain/v2/smart-query?domainName=' . urlencode((string) $domainName);
+        if ($sortBy !== '') {
+            $url .= '&sortBy=' . urlencode((string) $sortBy);
+        }
+        $resp = $this->getApi($url);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return [];
+        }
+        return $resp['data']['resultList'] ?? [];
+    }
+
+    /**
+     * Per-extension rules (registration / transfer / grace / document).
+     * GET domain/v2/ext-rules?ext=...&ruleType=...
+     * @param string $ext
+     * @param string $ruleType registration|transfer|grace|document
+     * @return array|false
+     */
+    public function getExtensionRules($ext, $ruleType = 'registration')
+    {
+        $ext = ltrim(trim((string) $ext), '.');
+        if ($ext === '') {
+            $this->addError('Extension is required.');
+            return false;
+        }
+        $resp = $this->getApi('domain/v2/ext-rules?ext=' . urlencode($ext) . '&ruleType=' . urlencode((string) $ruleType));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
     }
 
     /* =====================================================================

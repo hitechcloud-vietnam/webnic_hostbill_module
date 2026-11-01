@@ -27,7 +27,11 @@
  *                  as premium when a subscription is returned (the zone-records
  *                  response also reports `sourceFrom` = basic|subscription).
  *
- * @author HiTechCloud
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 #[\AllowDynamicProperties]
 class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
@@ -698,6 +702,31 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
     public function getDomainLimit()
     {
         return $this->options["maxdomain"]["value"];
+    }
+
+    /**
+     * Unified record delete that works for BOTH basic and premium/subscription
+     * zones (WebNIC routes it internally by the zone's tier), removing every
+     * rdata value for the (type,name) pair in one call.
+     * DELETE dns/v2/zone/{zone}/record?type=...&name=...
+     * Complements removeValue(), which targets a single rdata value per call.
+     */
+    public function deleteZoneRecordUnified($domain, $type, $name = "")
+    {
+        $domain = $this->getDomainName($domain);
+        $type = strtoupper(trim((string) $type));
+        if (empty($domain) || $type === "") {
+            $this->addError("Zone and record type are required");
+            return false;
+        }
+        $sendName = ($name === "" || $name === "@") ? "" : (string) $name;
+        $q = "zone/" . rawurlencode($domain) . "/record?type=" . rawurlencode($type) . "&name=" . rawurlencode($sendName);
+        $resp = $this->request("DELETE", $q);
+        if ($this->ok($resp)) {
+            $this->addInfo("Record deleted: " . $type . " " . ($sendName === "" ? "@" : $sendName));
+            return true;
+        }
+        return false;
     }
 
     /* ------------------------------------------------------------------ */

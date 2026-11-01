@@ -10,6 +10,12 @@
  *
  * Every route is `"auth": true` and re-checks ownership — `auth` only proves a
  * client is calling, not that this client owns the service in the URL.
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 
 if (!defined('MAINDIR')) {

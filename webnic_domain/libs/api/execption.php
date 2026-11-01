@@ -5,7 +5,11 @@ namespace Domain\webnic_domain\Libs\API;
  * WebNIC API exception carrying the sub-code and field/validation errors
  * returned in a WebNIC error envelope.
  *
- * @package Domain\webnic_domain\Libs\API
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.2026-11-02.2
  */
 class Exception extends \Exception
 {

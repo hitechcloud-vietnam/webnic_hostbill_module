@@ -8,6 +8,12 @@
  * certificate / tax lookup).
  *
  * @property webnic_domain $module
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.2026-11-02.2
  */
 class webnic_domain_controller extends HBController
 {

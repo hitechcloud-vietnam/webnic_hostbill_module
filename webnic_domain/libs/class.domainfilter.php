@@ -7,7 +7,12 @@ namespace Domain\webnic_domain;
  * class is provided for reuse/testing and reads keywords.json from this dir.
  *
  * Class Domainfilter
- * @package Domain\webnic_domain
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.2026-11-02.2
  */
 class Domainfilter
 {

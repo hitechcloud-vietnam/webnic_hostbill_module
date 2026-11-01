@@ -21,6 +21,12 @@
  *
  * @see https://api.webnic.cc           Live API
  * @see https://oteapi.webnic.cc        OTE / test API
+ *
+ * @package   HiTechCloud WebNIC Suite
+ * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
+ * @license   MIT
+ * @version   1.1.0
  */
 class webnic_ssl extends SSLModule
 {
@@ -1484,6 +1490,113 @@ class webnic_ssl extends SSLModule
 
         HBCache::set($cacheKey, $rules, HBC\T_MINUTE * 30);
         return $rules;
+    }
+
+    // ------------------------------------------------------------------
+    // Additional WebNIC SSL API features (orders / products / contacts)
+    // ------------------------------------------------------------------
+
+    /**
+     * Paginated order search across the reseller account.
+     * POST /ssl/v2/orders/search ({filters:[{field,operator,value}], pagination}).
+     * Allowed filter fields: orderId, commonName, email, company, orderStatus,
+     * certStatus, product, term. Returns the raw search `data`.
+     */
+    public function searchOrders(array $filters = [], $page = 1, $pageSize = 20)
+    {
+        return $this->apiJson('POST', '/ssl/v2/orders/search', [
+            'filters' => array_values($filters),
+            'pagination' => [
+                'page' => max(1, (int) $page),
+                'pageSize' => max(1, (int) $pageSize),
+            ],
+        ]);
+    }
+
+    /**
+     * Detailed metadata for a single SSL product.
+     * GET /ssl/v2/products/info?productKey=...
+     */
+    public function getProductInfo($productKey)
+    {
+        $productKey = trim((string) $productKey);
+        if ($productKey === '') {
+            throw new Exception('A product key is required.');
+        }
+        return $this->apiJson('GET', '/ssl/v2/products/info', [], ['productKey' => $productKey]);
+    }
+
+    /**
+     * Real-time price quote for a specific product configuration.
+     * GET /ssl/v2/products/pricing?productKey=&term=[&commonSAN&wildcardSAN]
+     */
+    public function getProductPricing($productKey, $term, $commonSan = null, $wildcardSan = null)
+    {
+        $productKey = trim((string) $productKey);
+        if ($productKey === '') {
+            throw new Exception('A product key is required.');
+        }
+        $query = [
+            'productKey' => $productKey,
+            'term' => max(1, (int) $term),
+        ];
+        if ($commonSan !== null) {
+            $query['commonSAN'] = (int) $commonSan;
+        }
+        if ($wildcardSan !== null) {
+            $query['wildcardSAN'] = (int) $wildcardSan;
+        }
+        return $this->apiJson('GET', '/ssl/v2/products/pricing', [], $query);
+    }
+
+    /**
+     * Retrieve a stored SSL contact.
+     * GET /ssl/v2/contact/info/{contactID}
+     */
+    public function getSslContactInfo($contactId)
+    {
+        $contactId = trim((string) $contactId);
+        if ($contactId === '') {
+            throw new Exception('A contact id is required.');
+        }
+        return $this->apiJson('GET', '/ssl/v2/contact/info/' . rawurlencode($contactId));
+    }
+
+    /**
+     * Delete an SSL contact.
+     * DELETE /ssl/v2/contact/delete/{contactId}
+     */
+    public function deleteSslContact($contactId)
+    {
+        $contactId = trim((string) $contactId);
+        if ($contactId === '') {
+            throw new Exception('A contact id is required.');
+        }
+        return $this->apiJson('DELETE', '/ssl/v2/contact/delete/' . rawurlencode($contactId));
+    }
+
+    /**
+     * Update an organization's contact details.
+     * PUT /ssl/v2/organization/{organizationId}/contact/update
+     * body: {organization:{...}, technicalContactId?}.
+     * The organization payload is normalised through the same schema used when
+     * creating the organization. $organizationId defaults to the stored one.
+     */
+    public function updateOrganizationContact(array $organization, $technicalContactId = null, $organizationId = null)
+    {
+        $organizationId = (string) ($organizationId ?: ($this->details['organizationId']['value'] ?? ''));
+        if ($organizationId === '') {
+            throw new Exception('No organization id is stored for this service.');
+        }
+        $payload = ['organization' => $this->normalizeOrganizationContact($organization)];
+        if (!empty($technicalContactId)) {
+            $payload['technicalContactId'] = (string) $technicalContactId;
+        }
+        return $this->apiJson(
+            'PUT',
+            '/ssl/v2/organization/' . rawurlencode($organizationId) . '/contact/update',
+            $payload
+        );
     }
 
     // ------------------------------------------------------------------
