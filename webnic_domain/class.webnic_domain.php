@@ -54,7 +54,7 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
      * Module version. Bump on every feature change so HostBill re-reads the contract.
      * @var string
      */
-    protected $version = '1.2026-11-02.1';
+    protected $version = '1.2026-11-02.2';
 
     /**
      * Module name, visible in admin portal.
@@ -130,6 +130,14 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
             'type'    => 'check',
             'default' => false,
         ],
+        // Connect market. VN enforces Vietnamese registrant rules, EKYC,
+        // proxy-TLD handling and VND price conversion; Global uses the
+        // standard international flow with source-currency pricing.
+        'Market' => [
+            'value'   => 'vn',
+            'type'    => 'select',
+            'default' => ['vn' => 'Vietnam (VN)', 'global' => 'Global'],
+        ],
         'registrant_user_id' => [
             'value'   => '',
             'type'    => 'input',
@@ -160,6 +168,7 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
         'Register',
         'Transfer',
         'Renew',
+        'RestoreDomain',
         'EppCode',
         'ManualRegister',
         'ContactInfo',
@@ -234,10 +243,32 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
         return true;
     }
 
+    /** Public accessor: the prepared punycode domain name for the loaded domain. */
+    public function apiDomainName()
+    {
+        if (empty($this->name)) {
+            $this->_prepare_name();
+        }
+        return $this->name;
+    }
+
     /** Is the configured environment LIVE? (OTE != 1) */
     protected function isLive()
     {
         return $this->configuration['OTE Environment']['value'] != 1;
+    }
+
+    /**
+     * Is the module connecting to the Vietnam market?
+     * Gates all Vietnam-specific behavior (registrant-name rules, EKYC,
+     * proxy-TLD handling and VND price conversion). Defaults to VN when
+     * the Market selector has never been saved.
+     * @return bool
+     */
+    protected function isVN()
+    {
+        $market = $this->configuration['Market']['value'] ?? 'vn';
+        return $market === '' || $market === 'vn';
     }
 
     /** Base host for the current environment. */
@@ -489,10 +520,13 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
                 return $prices;
             }
 
-            // Skip .vn TLDs (handled by the local VNNIC registrar).
-            $tldsResponse['data'] = array_filter($tldsResponse['data'], function ($item) {
-                return substr($item, -2) !== 'vn';
-            });
+            // Vietnam market skips .vn TLDs (handled by the local VNNIC
+            // registrar). The Global market imports every TLD, .vn included.
+            if ($this->isVN()) {
+                $tldsResponse['data'] = array_filter($tldsResponse['data'], function ($item) {
+                    return substr($item, -2) !== 'vn';
+                });
+            }
 
             $tldString   = implode(',', $tldsResponse['data']);
             $priceParams = [
@@ -515,20 +549,26 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
                 return $prices;
             }
 
+            $isVN      = $this->isVN();
             $priceActs = ['register' => 'register', 'renewal' => 'renew', 'transfer' => 'transfer', 'restore' => 'redemption'];
             foreach ($pricesResponse['data']['items'] as $tldPrice) {
                 foreach (['productPricing', 'localPrice'] as $bucket) {
                     if (empty($tldPrice[$bucket]['price'])) {
                         continue;
                     }
+                    // VN converts to VND; Global keeps the source currency as-is.
+                    $currency = $isVN ? 'VND' : ($tldPrice[$bucket]['currency'] ?? 'USD');
                     foreach ($tldPrice[$bucket]['price'] as $priceType => $details) {
                         if (!isset($priceActs[$priceType]) || empty($details['ascii'])) {
                             continue;
                         }
                         foreach ($details['ascii'] as $year => $price) {
-                            $key = '.' . $tldPrice['productKey'];
-                            $prices['VND'][$key][$year]['period']                  = $year;
-                            $prices['VND'][$key][$year][$priceActs[$priceType]]    = round($price * 26000 / 1000) * 1000;
+                            $key    = '.' . $tldPrice['productKey'];
+                            // VN: multiply to VND and round to the nearest 1,000.
+                            // Global: import the raw source-currency amount.
+                            $amount = $isVN ? round($price * 26000 / 1000) * 1000 : $price;
+                            $prices[$currency][$key][$year]['period']               = $year;
+                            $prices[$currency][$key][$year][$priceActs[$priceType]] = $amount;
                         }
                     }
                 }
@@ -563,8 +603,9 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
 
         $this->_prepare_name();
 
-        // Vietnamese registrant-name / sensitive-keyword validation (skipped for manual).
-        if (empty($this->options['manual_reg'])) {
+        // Vietnamese registrant-name / sensitive-keyword / EKYC validation.
+        // Only enforced for the Vietnam market; Global skips it entirely.
+        if ($this->isVN() && empty($this->options['manual_reg'])) {
             if (!$this->runRegistrantNameChecks(true)) {
                 return false;
             }
@@ -598,13 +639,19 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
                 'domainType'             => array_key_exists('premium', $lookupDomain) ? 'premium' : 'standard',
                 'term'                   => $this->period,
                 'nameservers'            => $ns,
-                'registrantUserId'       => $this->configuration['registrant_user_id']['value'],
+                'registrantUserId'       => (string) $this->configuration['registrant_user_id']['value'],
                 'registrantContactId'    => $registrant,
                 'administratorContactId' => $admin,
                 'technicalContactId'     => $technical,
                 'billingContactId'       => $billing,
             ];
-            if (isset($this->options['ext'][$this->proxy_field]) && in_array($this->options['tld'], $this->proxy_tlds)) {
+            // IDN language code (register-domain `lang`, registry default "eng").
+            $lang = $this->idnLanguageCode();
+            if ($lang) {
+                $params['lang'] = $lang;
+            }
+            // Proxy / local-presence handling is Vietnam-market only.
+            if ($this->isVN() && isset($this->options['ext'][$this->proxy_field]) && in_array($this->options['tld'], $this->proxy_tlds)) {
                 $params['addons']['proxy'] = true;
             }
             $params['addons']['autoRenew'] = false;
@@ -616,6 +663,19 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
             if (!$this->ok($response)) {
                 $this->addError($this->errMsg($response));
                 return false;
+            }
+
+            // Pending orders (offline-processed TLDs) still return code 1000 but
+            // with data.pendingOrder == true; mark the domain pending, not active.
+            if (!empty($response['data']['pendingOrder'])) {
+                if (!empty($response['data']['pendingOrderId'])) {
+                    $ex = $this->details['extended'];
+                    $ex['pendingOrderId'] = $response['data']['pendingOrderId'];
+                    $this->updateExtended($ex);
+                }
+                $this->addDomain(HBC\DOMAIN_STATE_PENDINGREGISTRATIO);
+                $this->addInfo('Domain registration submitted and is pending processing.');
+                return true;
             }
 
             $this->addDomain(HBC\DOMAIN_STATE_ACTIVE);
@@ -645,18 +705,18 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
         $tld = end($domainNameArray);
         $lookupDomain = $this->lookupDomain($sld, $tld);
 
-        // Non-blocking sensitive keyword notice + blocking name checks (unless manual).
-        $domainFilter = $this->checkKeywordSensitive($this->name);
-        if ($domainFilter) {
-            $this->addError('Domain contains a sensitive keyword, please review: ' . $domainFilter . '.');
-        }
-        if (empty($this->options['manual_reg'])) {
-            if (!$this->runRegistrantNameChecks(false)) {
-                return false;
+        // Vietnam-only: sensitive-keyword notice + registrant-name / EKYC checks.
+        if ($this->isVN()) {
+            $domainFilter = $this->checkKeywordSensitive($this->name);
+            if ($domainFilter) {
+                $this->addError('Domain contains a sensitive keyword, please review: ' . $domainFilter . '.');
+            }
+            if (empty($this->options['manual_reg'])) {
+                if (!$this->runRegistrantNameChecks(false)) {
+                    return false;
+                }
             }
         }
-
-        $ns = $this->prepareNameserversData();
 
         try {
             $contacts   = $this->NewContacts();
@@ -668,21 +728,23 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
             $params = [
                 'domainName'             => $this->name,
                 'domainType'             => array_key_exists('premium', $lookupDomain) ? 'premium' : 'standard',
-                'term'                   => $this->period,
-                'nameservers'            => $ns,
-                'registrantUserId'       => $this->configuration['registrant_user_id']['value'],
+                'authInfo'               => $this->options['epp_code'],
+                'registrantUserId'       => (string) $this->configuration['registrant_user_id']['value'],
                 'registrantContactId'    => $registrant,
                 'administratorContactId' => $admin,
                 'technicalContactId'     => $technical,
                 'billingContactId'       => $billing,
+                // NS/nameserver details are a deprecated transfer-in param; no longer sent.
+                'subscribeProxy'         => false,
             ];
-            if (isset($this->options['ext'][$this->proxy_field]) && in_array($this->options['tld'], $this->proxy_tlds)) {
+            // Proxy subscription is Vietnam-market only.
+            if ($this->isVN() && isset($this->options['ext'][$this->proxy_field]) && in_array($this->options['tld'], $this->proxy_tlds)) {
                 $params['subscribeProxy'] = true;
             }
-            if (!array_key_exists('subscribeProxy', $params)) {
-                $params['subscribeProxy'] = false;
+            // HK bundled-domain support (optional transfer-in parameter).
+            if (!empty($this->options['ext']['bundledDomain'])) {
+                $params['bundledDomain'] = $this->options['ext']['bundledDomain'];
             }
-            $params['authInfo'] = $this->options['epp_code'];
 
             $response = $this->postApi('domain/v2/transfer-in', $params);
             // WebNIC returns 100 (pending) on an accepted transfer-in request.
@@ -708,9 +770,34 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
     public function Renew()
     {
         $this->_prepare_name();
-        $response = $this->postApi('domain/v2/renew', ['domainName' => $this->name, 'term' => $this->period]);
+
+        $params = [
+            'domainName' => $this->name,
+            'term'       => $this->period,
+        ];
+
+        // Send the current expiry date as an idempotency guard so an accidental
+        // repeat call cannot double-renew (per the 2025-08-14 / 2025-11-11 renew
+        // API changes). Also set domainType so premium renewals are priced right.
+        $details = $this->_domain_details();
+        if (is_array($details)) {
+            if (!empty($details['dtexpire'])) {
+                $expiryParts = explode('T', (string) $details['dtexpire']);
+                $params['domainExpiryDate'] = reset($expiryParts);
+            }
+            $params['domainType'] = !empty($details['premium']) ? 'premium' : 'standard';
+        }
+
+        $response = $this->postApi('domain/v2/renew', $params);
         if (!$this->ok($response)) {
-            $this->addError($this->errMsg($response));
+            // A domain in the redemption grace period can no longer be renewed;
+            // it must be restored first. Surface that and point at Restore().
+            $msg = $this->errMsg($response);
+            if (stripos($msg, 'redemption') !== false || stripos($msg, 'grace') !== false) {
+                $this->addError('Domain is in the redemption grace period and cannot be renewed; use Restore (redemption) first.');
+                return false;
+            }
+            $this->addError($msg);
             return false;
         }
         $this->addPeriod();
@@ -1732,6 +1819,12 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
         $attributes   = [];
         $attributes[] = ['name' => 'identificationNumber', 'description' => 'Identification Number', 'type' => 'input'];
         $attributes[] = ['name' => 'organizationRegistrationNumber', 'description' => 'Organization Registration Number', 'type' => 'input'];
+        // IDN language code, required when registering IDN (non-ASCII) domains.
+        $attributes[] = ['name' => 'idnLanguageCode', 'description' => 'IDN Language Code (e.g. CHI, ZHO, JPN, KOR; blank for ASCII/eng)', 'type' => 'input'];
+
+        if (substr($this->options['tld'], -2) == 'hk') {
+            $attributes[] = ['name' => 'bundledDomain', 'description' => 'HK Bundled Domain (optional, transfer-in)', 'type' => 'input'];
+        }
 
         if (substr($this->options['tld'], -2) == 'us') {
             $attributes[] = ['name' => 'nexus', 'description' => 'Nexus Category', 'type' => 'select', 'option' => [
@@ -1829,9 +1922,13 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
      */
     protected function validateRegistrant()
     {
-        $requireFields = ['firstname', 'lastname', 'nationalid', 'phonenumber', 'state', 'city', 'address1'];
+        $requireFields = ['firstname', 'lastname', 'phonenumber', 'state', 'city', 'address1'];
         $registrant    = $this->domain_contacts['registrant'];
 
+        // nationalid is a Vietnam-market registrant requirement only.
+        if ($this->isVN()) {
+            $requireFields[] = 'nationalid';
+        }
         if (!empty($registrant['companyname'])) {
             $requireFields[] = 'taxid';
         }
@@ -1881,7 +1978,7 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
             return false;
         }
 
-        if ($enforceAvailabilityEkyc) {
+        if ($enforceAvailabilityEkyc && $this->isVN()) {
             $full_name = $registrant['companyname'] ? mb_strtoupper($registrant['companyname']) : mb_strtoupper($registrant['lastname'] . ' ' . $registrant['firstname']);
             $idnumber  = $registrant['companyname'] ? $registrant['taxid'] : $registrant['nationalid'];
 
@@ -1997,6 +2094,528 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
             return false;
         }
         return true;
+    }
+
+    /* =====================================================================
+     *  ADDITIONAL WEBNIC API FEATURES
+     * ===================================================================== */
+
+    /**
+     * IDN language code for the current order (register/transfer `lang`).
+     * Read from the extended attribute "idnLanguageCode"; empty = registry default.
+     * @return string
+     */
+    protected function idnLanguageCode()
+    {
+        $code = $this->options['ext']['idnLanguageCode'] ?? '';
+        return trim((string) $code);
+    }
+
+    /**
+     * Restore a domain from the redemption grace period.
+     * POST domain/v2/restore  {domainName, agreeRestorePolicy, domainType?}
+     * domainType ("premium") is mandatory for premium domains.
+     * @return bool
+     */
+    public function RestoreDomain()
+    {
+        $this->_prepare_name();
+
+        $params = [
+            'domainName'         => $this->name,
+            'agreeRestorePolicy' => true,
+        ];
+
+        $details = $this->_domain_details();
+        if (is_array($details) && !empty($details['premium'])) {
+            $params['domainType'] = 'premium';
+        }
+
+        $response = $this->postApi('domain/v2/restore', $params);
+        if (!$this->ok($response)) {
+            $this->addError($this->errMsg($response));
+            return false;
+        }
+        $this->logAction(['action' => 'Restore Domain']);
+        $this->addInfo('Domain restoration submitted successfully.');
+        return true;
+    }
+
+    /** Alias of RestoreDomain(). */
+    public function Restore()
+    {
+        return $this->RestoreDomain();
+    }
+
+    /**
+     * List domains bound to a host/nameserver (admin host panel).
+     * POST domain/v2/host/domainlist/search?nameserver=...  {pagination}
+     * @param string $nameserver
+     * @param int    $page
+     * @param int    $pageSize
+     * @return array items (empty on failure).
+     */
+    public function getHostLinkedDomains($nameserver, $page = 1, $pageSize = 50)
+    {
+        $url    = 'domain/v2/host/domainlist/search';
+        if ($nameserver !== '') {
+            $url .= '?nameserver=' . urlencode($nameserver);
+        }
+        $params = ['pagination' => ['page' => (int) $page, 'pageSize' => (int) $pageSize]];
+        $resp   = $this->postApi($url, $params);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return [];
+        }
+        return $resp['data']['items'] ?? [];
+    }
+
+    /**
+     * Query the transfer type for the current domain.
+     * GET domain/v2/query-transfer-type?domainName=...
+     * @return string|false registrar_transfer|reseller_transfer|domain_owner
+     */
+    public function queryTransferType()
+    {
+        $this->_prepare_name();
+        $resp = $this->getApi('domain/v2/query-transfer-type?domainName=' . $this->name);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data']['transferType'] ?? false;
+    }
+
+    /**
+     * Get the Universal WHOIS record for the current domain.
+     * GET domain/v2/whois?domainName=...
+     * Note: RDDS/WHOIS is being phased out and this is now best-effort.
+     * @return array|false
+     */
+    public function getUniversalWhois()
+    {
+        $this->_prepare_name();
+        $resp = $this->getApi('domain/v2/whois?domainName=' . $this->name);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  DNSSEC  (path domain/v2/dnssec shared by GET/POST/DELETE)
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Whether DNSSEC is supported for the current domain's registry.
+     * GET domain/v2/dnssec/support?domainName=...
+     * @return bool
+     */
+    public function checkDnssecSupported()
+    {
+        $this->_prepare_name();
+        $resp = $this->getApi('domain/v2/dnssec/support?domainName=' . $this->name);
+        if (!$this->ok($resp)) {
+            return false;
+        }
+        return !empty($resp['data']['dnssecSupported']);
+    }
+
+    /**
+     * Get the current DNSSEC DS records.
+     * GET domain/v2/dnssec?domainName=...
+     * @return array dsDatas (empty on none/failure).
+     */
+    public function getDnssecInfo()
+    {
+        $this->_prepare_name();
+        $resp = $this->getApi('domain/v2/dnssec?domainName=' . $this->name);
+        if (!$this->ok($resp)) {
+            return [];
+        }
+        return $resp['data']['dsDatas'] ?? [];
+    }
+
+    /**
+     * Replace the DNSSEC DS record set.
+     * POST domain/v2/dnssec?domainName=...  {dsDatas:[{keyTag,algorithm,digestType,digest}]}
+     * @param array $dsDatas
+     * @return bool
+     */
+    public function updateDnssec($dsDatas = [])
+    {
+        $this->_prepare_name();
+
+        // Normalise every DS field to a string, as the API expects.
+        $clean = [];
+        foreach ((array) $dsDatas as $ds) {
+            if (empty($ds['keyTag']) || empty($ds['digest'])) {
+                continue;
+            }
+            $clean[] = [
+                'keyTag'     => (string) $ds['keyTag'],
+                'algorithm'  => (string) ($ds['algorithm'] ?? ''),
+                'digestType' => (string) ($ds['digestType'] ?? ''),
+                'digest'     => (string) $ds['digest'],
+            ];
+        }
+        if (empty($clean)) {
+            $this->addError('No DNSSEC DS records supplied.');
+            return false;
+        }
+
+        $resp = $this->postApi('domain/v2/dnssec?domainName=' . $this->name, ['dsDatas' => $clean]);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->logAction(['action' => 'Update DNSSEC']);
+        $this->addInfo('DNSSEC records updated.');
+        return true;
+    }
+
+    /**
+     * Disable DNSSEC for the current domain.
+     * DELETE domain/v2/dnssec?domainName=...
+     * @return bool
+     */
+    public function deleteDnssec()
+    {
+        $this->_prepare_name();
+        $resp = $this->deleteApi('domain/v2/dnssec?domainName=' . $this->name);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->logAction(['action' => 'Delete DNSSEC']);
+        $this->addInfo('DNSSEC disabled.');
+        return true;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  REGISTRANT ACCOUNTS
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Create a WebNIC registrant account.
+     * POST domain/v2/registrant/create?username=...
+     * @param string $username min 10 chars, mixed alphanumeric.
+     * @return array|false data (incl. registrantUserId) on success.
+     */
+    public function createRegistrantAccount($username)
+    {
+        $username = trim((string) $username);
+        if ($username === '') {
+            $this->addError('Registrant username is required.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/registrant/create?username=' . urlencode($username));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->addInfo('Registrant account created: ' . ($resp['data']['registrantUserId'] ?? ''));
+        return $resp['data'] ?? [];
+    }
+
+    /**
+     * Search registrant accounts by username keyword (min 5 chars).
+     * GET domain/v2/registrant/list?username=...
+     * The per-row id is returned under `id` (not registrantUserId).
+     * @param string $username
+     * @return array list (empty on none/failure).
+     */
+    public function listRegistrantAccounts($username)
+    {
+        $username = trim((string) $username);
+        if (strlen($username) < 5) {
+            $this->addError('Registrant search keyword must be at least 5 characters.');
+            return [];
+        }
+        $resp = $this->getApi('domain/v2/registrant/list?username=' . urlencode($username));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return [];
+        }
+        return $resp['data'] ?? [];
+    }
+
+    /**
+     * Reassign a domain to a different registrant account.
+     * PUT domain/v2/registrant-account?domainName=...&registrantUsername=...
+     * @param string $domainName
+     * @param string $registrantUsername
+     * @return bool
+     */
+    public function reassignRegistrantAccount($domainName, $registrantUsername)
+    {
+        $domainName         = trim((string) $domainName);
+        $registrantUsername = trim((string) $registrantUsername);
+        if ($domainName === '' || $registrantUsername === '') {
+            $this->addError('Both domain name and registrant username are required.');
+            return false;
+        }
+        $url  = 'domain/v2/registrant-account?domainName=' . urlencode($domainName)
+              . '&registrantUsername=' . urlencode($registrantUsername);
+        $resp = $this->putApi($url);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->addInfo('Domain reassigned to registrant: ' . $registrantUsername);
+        return true;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  TRANSFER-AWAY STATUS  (registrar + reseller)
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Get registrar transfer-away status by domain name.
+     * GET domain/v2/transfer-away/status?domainName=...
+     * @param string $domainName
+     * @return array|false
+     */
+    public function getRegistrarTransferAwayStatus($domainName)
+    {
+        $resp = $this->getApi('domain/v2/transfer-away/status?domainName=' . urlencode((string) $domainName));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Get registrar transfer-away status by record id.
+     * GET domain/v2/transfer-away/status/{id}
+     * @param string|int $id
+     * @return array|false
+     */
+    public function getRegistrarTransferAwayStatusById($id)
+    {
+        $resp = $this->getApi('domain/v2/transfer-away/status/' . urlencode((string) $id));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Approve/reject a registrar transfer-away request.
+     * PUT domain/v2/transfer-away/status/{id}  {approveType, approve, approveRemarks?}
+     * @param string|int $id
+     * @param string     $approveType registrant|partner
+     * @param bool       $approve
+     * @param string     $remarks
+     * @return bool
+     */
+    public function updateRegistrarTransferAwayStatus($id, $approveType, $approve, $remarks = '')
+    {
+        $params = [
+            'approveType' => $approveType,
+            'approve'     => (bool) $approve,
+        ];
+        if ($remarks !== '') {
+            $params['approveRemarks'] = $remarks;
+        }
+        $resp = $this->putApi('domain/v2/transfer-away/status/' . urlencode((string) $id), $params);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->addInfo('Registrar transfer-away status updated.');
+        return true;
+    }
+
+    /**
+     * Get reseller transfer-away status by domain name.
+     * GET domain/v2/reseller-transfer/status?domainName=...
+     * @param string $domainName
+     * @return array|false
+     */
+    public function getResellerTransferAwayStatus($domainName)
+    {
+        $resp = $this->getApi('domain/v2/reseller-transfer/status?domainName=' . urlencode((string) $domainName));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Get reseller transfer-away status by record id.
+     * GET domain/v2/reseller-transfer/status/{id}
+     * @param string|int $id
+     * @return array|false
+     */
+    public function getResellerTransferAwayStatusById($id)
+    {
+        $resp = $this->getApi('domain/v2/reseller-transfer/status/' . urlencode((string) $id));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Approve/reject a reseller transfer-away request.
+     * PUT domain/v2/reseller-transfer/status/{id}  {approveType, approve, approveRemarks?}
+     * @param string|int $id
+     * @param string     $approveType registrant|partner|both
+     * @param bool       $approve
+     * @param string     $remarks
+     * @return bool
+     */
+    public function updateResellerTransferAwayStatus($id, $approveType, $approve, $remarks = '')
+    {
+        $params = [
+            'approveType' => $approveType,
+            'approve'     => (bool) $approve,
+        ];
+        if ($remarks !== '') {
+            $params['approveRemarks'] = $remarks;
+        }
+        $resp = $this->putApi('domain/v2/reseller-transfer/status/' . urlencode((string) $id), $params);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $this->addInfo('Reseller transfer-away status updated.');
+        return true;
+    }
+
+    /* --------------------------------------------------------------------- *
+     *  BULK OPERATIONS
+     * --------------------------------------------------------------------- */
+
+    /**
+     * Submit a bulk domain registration batch.
+     * POST domain/v2/bulk/register  {domainRegistrationList:[...]}
+     * @param array $registrationList each: domainName, term, nameservers, *ContactId, registrantUserId, domainType?
+     * @return string|false taskId on success.
+     */
+    public function bulkRegister($registrationList)
+    {
+        if (empty($registrationList)) {
+            $this->addError('No domains supplied for bulk registration.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/bulk/register', ['domainRegistrationList' => array_values($registrationList)]);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $taskId = $resp['data']['taskId'] ?? false;
+        $this->addInfo('Bulk registration submitted. Task ID: ' . $taskId);
+        return $taskId;
+    }
+
+    /**
+     * Submit a bulk domain renewal batch.
+     * POST domain/v2/bulk/renew  {domainRenewalList:[{domainName,term}]}
+     * @param array $renewalList each: domainName, term
+     * @return string|false taskId on success.
+     */
+    public function bulkRenew($renewalList)
+    {
+        if (empty($renewalList)) {
+            $this->addError('No domains supplied for bulk renewal.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/bulk/renew', ['domainRenewalList' => array_values($renewalList)]);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        $taskId = $resp['data']['taskId'] ?? false;
+        $this->addInfo('Bulk renewal submitted. Task ID: ' . $taskId);
+        return $taskId;
+    }
+
+    /**
+     * Get the overview of a bulk batch.
+     * GET domain/v2/bulk/report?taskId=...
+     * @param string $taskId
+     * @return array|false
+     */
+    public function getBulkReportOverview($taskId)
+    {
+        $taskId = trim((string) $taskId);
+        if ($taskId === '') {
+            $this->addError('Task ID is required.');
+            return false;
+        }
+        $resp = $this->getApi('domain/v2/bulk/report?taskId=' . urlencode($taskId));
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        return $resp['data'] ?? false;
+    }
+
+    /**
+     * Get the per-domain detail rows of a bulk batch.
+     * POST domain/v2/bulk/report/{taskId}/details/list  {filters?, pagination?}
+     * @param string $taskId
+     * @param array  $filters    each: field (domainName|status), operator (EQUAL), value
+     * @param array  $pagination page, pageSize
+     * @return array items (empty on failure).
+     */
+    public function getBulkReportDetails($taskId, $filters = [], $pagination = [])
+    {
+        $taskId = trim((string) $taskId);
+        if ($taskId === '') {
+            $this->addError('Task ID is required.');
+            return [];
+        }
+        $params = [];
+        if (!empty($filters)) {
+            $params['filters'] = array_values($filters);
+        }
+        $params['pagination'] = [
+            'page'     => (int) ($pagination['page'] ?? 1),
+            'pageSize' => (int) ($pagination['pageSize'] ?? 50),
+        ];
+        $resp = $this->postApi('domain/v2/bulk/report/' . urlencode($taskId) . '/details/list', $params);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return [];
+        }
+        return $resp['data']['items'] ?? [];
+    }
+
+    /**
+     * Bulk-replace contacts across many domains (creates a pending order).
+     * POST domain/v2/contact/replace  {domainList:[], contactTypeMap:{...}}
+     * Returns the Job Order ID string (query via Get Pending Order Info).
+     * @param array $domainList
+     * @param array $contactTypeMap keys: registrant|administrator|technical|billing => contactId
+     * @return string|false job order id.
+     */
+    public function bulkReplaceContact($domainList, $contactTypeMap)
+    {
+        $domainList = array_values(array_filter((array) $domainList));
+        $map        = array_filter((array) $contactTypeMap, function ($v) {
+            return $v !== '' && $v !== null;
+        });
+        if (empty($domainList) || empty($map)) {
+            $this->addError('A domain list and at least one contact id are required.');
+            return false;
+        }
+        $resp = $this->postApi('domain/v2/contact/replace', ['domainList' => $domainList, 'contactTypeMap' => $map]);
+        if (!$this->ok($resp)) {
+            $this->addError($this->errMsg($resp));
+            return false;
+        }
+        // data is a plain Job Order ID string for this endpoint.
+        $jobOrderId = is_string($resp['data'] ?? null) ? $resp['data'] : ($resp['data']['id'] ?? '');
+        $this->addInfo('Bulk contact replacement submitted. Job Order ID: ' . $jobOrderId);
+        return $jobOrderId;
     }
 
     /* =====================================================================

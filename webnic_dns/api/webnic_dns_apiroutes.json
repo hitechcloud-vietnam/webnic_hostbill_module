@@ -1,0 +1,236 @@
+{
+    "file": "includes/modules/Hosting/webnic_dns/api/class.webnic_dns_apiroutes.php",
+    "class": "webnic_dns_apiroutes",
+    "name": "WebNIC DNS",
+    "description": "REST routes a client can drive for a WebNIC DNS service: list zones and manage records",
+    "category": [
+        {
+            "name": "WebNIC DNS",
+            "description": "WebNIC DNS v2 zones and records resold through this installation"
+        }
+    ],
+    "route": {
+        "GET /service/@id/webnic_dns/zones": {
+            "name": "List DNS Zones",
+            "description": "DNS zones that belong to the service",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zones",
+            "auth": true,
+            "handle": "zones",
+            "uuid": "e8d10001-7b22-4d31-9f01-000000000001",
+            "priority": 10,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zones"
+        },
+        "GET /service/@id/webnic_dns/zone/@domain/records": {
+            "name": "List Zone Records",
+            "description": "All DNS records in one zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zone/@domain/records",
+            "auth": true,
+            "handle": "records",
+            "uuid": "e8d10002-7b22-4d31-9f01-000000000002",
+            "priority": 20,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zone/@domain/records"
+        },
+        "POST /service/@id/webnic_dns/zone/@domain/record": {
+            "name": "Add DNS Record",
+            "description": "Add a record to a zone (body: type, name, content, ttl, priority)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "type", "description": "Record type (A, AAAA, CNAME, MX, TXT, ...)", "required": true},
+                {"type": "string", "name": "name", "description": "Record host/name", "required": true},
+                {"type": "string", "name": "content", "description": "Record value", "required": true},
+                {"type": "int", "name": "ttl", "description": "TTL in seconds", "required": false},
+                {"type": "int", "name": "priority", "description": "Priority (MX/SRV)", "required": false}
+            ],
+            "route": "POST /service/@id/webnic_dns/zone/@domain/record",
+            "auth": true,
+            "handle": "addRecord",
+            "uuid": "e8d10003-7b22-4d31-9f01-000000000003",
+            "priority": 30,
+            "category": "WebNIC DNS",
+            "http": "POST",
+            "address": "/service/@id/webnic_dns/zone/@domain/record"
+        },
+        "PUT /service/@id/webnic_dns/zone/@domain/record/@record": {
+            "name": "Edit DNS Record",
+            "description": "Update a record by its id (body: type, name, content, ttl, priority)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "record", "description": "Record id", "inurl": true, "required": true}
+            ],
+            "route": "PUT /service/@id/webnic_dns/zone/@domain/record/@record",
+            "auth": true,
+            "handle": "editRecord",
+            "uuid": "e8d10004-7b22-4d31-9f01-000000000004",
+            "priority": 40,
+            "category": "WebNIC DNS",
+            "http": "PUT",
+            "address": "/service/@id/webnic_dns/zone/@domain/record/@record"
+        },
+        "DELETE /service/@id/webnic_dns/zone/@domain/record/@record": {
+            "name": "Delete DNS Record",
+            "description": "Remove a record from a zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "record", "description": "Record id", "inurl": true, "required": true}
+            ],
+            "route": "DELETE /service/@id/webnic_dns/zone/@domain/record/@record",
+            "auth": true,
+            "handle": "deleteRecord",
+            "uuid": "e8d10005-7b22-4d31-9f01-000000000005",
+            "priority": 50,
+            "category": "WebNIC DNS",
+            "http": "DELETE",
+            "address": "/service/@id/webnic_dns/zone/@domain/record/@record"
+        },
+        "GET /service/@id/webnic_dns/zone/@domain/dnssec": {
+            "name": "Get Zone DNSSEC",
+            "description": "DNSSEC state plus DS/DNSKEY records for a zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zone/@domain/dnssec",
+            "auth": true,
+            "handle": "dnssec",
+            "uuid": "e8d10006-7b22-4d31-9f01-000000000006",
+            "priority": 60,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zone/@domain/dnssec"
+        },
+        "GET /service/@id/webnic_dns/zone/@domain/url-forwardings": {
+            "name": "List URL Forwardings",
+            "description": "URL forwardings configured on a zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zone/@domain/url-forwardings",
+            "auth": true,
+            "handle": "urlForwardings",
+            "uuid": "e8d10007-7b22-4d31-9f01-000000000007",
+            "priority": 70,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zone/@domain/url-forwardings"
+        },
+        "POST /service/@id/webnic_dns/zone/@domain/url-forwarding": {
+            "name": "Add URL Forwarding",
+            "description": "Add a URL forwarding (body: subdomain, targetUrl, overrideConflictingRecord)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "subdomain", "description": "Subdomain host", "required": true},
+                {"type": "string", "name": "targetUrl", "description": "Target URL (http/https)", "required": true},
+                {"type": "bool", "name": "overrideConflictingRecord", "description": "Override a conflicting record", "required": false}
+            ],
+            "route": "POST /service/@id/webnic_dns/zone/@domain/url-forwarding",
+            "auth": true,
+            "handle": "addUrlForwarding",
+            "uuid": "e8d10008-7b22-4d31-9f01-000000000008",
+            "priority": 80,
+            "category": "WebNIC DNS",
+            "http": "POST",
+            "address": "/service/@id/webnic_dns/zone/@domain/url-forwarding"
+        },
+        "DELETE /service/@id/webnic_dns/zone/@domain/url-forwarding/@subdomain": {
+            "name": "Remove URL Forwarding",
+            "description": "Remove a URL forwarding by subdomain",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "subdomain", "description": "Subdomain host", "inurl": true, "required": true}
+            ],
+            "route": "DELETE /service/@id/webnic_dns/zone/@domain/url-forwarding/@subdomain",
+            "auth": true,
+            "handle": "removeUrlForwarding",
+            "uuid": "e8d10009-7b22-4d31-9f01-000000000009",
+            "priority": 90,
+            "category": "WebNIC DNS",
+            "http": "DELETE",
+            "address": "/service/@id/webnic_dns/zone/@domain/url-forwarding/@subdomain"
+        },
+        "GET /service/@id/webnic_dns/zone/@domain/email-forwardings": {
+            "name": "List Email Forwardings",
+            "description": "Email forwardings configured on a zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zone/@domain/email-forwardings",
+            "auth": true,
+            "handle": "emailForwardings",
+            "uuid": "e8d1000a-7b22-4d31-9f01-00000000000a",
+            "priority": 100,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zone/@domain/email-forwardings"
+        },
+        "POST /service/@id/webnic_dns/zone/@domain/email-forwarding": {
+            "name": "Add Email Forwarding",
+            "description": "Add an email forwarding (body: user, targetEmail, overrideConflictingRecord)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "user", "description": "Source email username", "required": true},
+                {"type": "string", "name": "targetEmail", "description": "Target destination email", "required": true},
+                {"type": "bool", "name": "overrideConflictingRecord", "description": "Override a conflicting record", "required": false}
+            ],
+            "route": "POST /service/@id/webnic_dns/zone/@domain/email-forwarding",
+            "auth": true,
+            "handle": "addEmailForwarding",
+            "uuid": "e8d1000b-7b22-4d31-9f01-00000000000b",
+            "priority": 110,
+            "category": "WebNIC DNS",
+            "http": "POST",
+            "address": "/service/@id/webnic_dns/zone/@domain/email-forwarding"
+        },
+        "DELETE /service/@id/webnic_dns/zone/@domain/email-forwarding/@user": {
+            "name": "Remove Email Forwarding",
+            "description": "Remove an email forwarding by source user",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true},
+                {"type": "string", "name": "user", "description": "Source email username", "inurl": true, "required": true}
+            ],
+            "route": "DELETE /service/@id/webnic_dns/zone/@domain/email-forwarding/@user",
+            "auth": true,
+            "handle": "removeEmailForwarding",
+            "uuid": "e8d1000c-7b22-4d31-9f01-00000000000c",
+            "priority": 120,
+            "category": "WebNIC DNS",
+            "http": "DELETE",
+            "address": "/service/@id/webnic_dns/zone/@domain/email-forwarding/@user"
+        },
+        "GET /service/@id/webnic_dns/zone/@domain/subscription": {
+            "name": "Get Zone Premium Subscription",
+            "description": "Premium (standalone-domain) DNS subscription detail for a zone",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "domain", "description": "Zone/domain name", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_dns/zone/@domain/subscription",
+            "auth": true,
+            "handle": "subscription",
+            "uuid": "e8d1000d-7b22-4d31-9f01-00000000000d",
+            "priority": 130,
+            "category": "WebNIC DNS",
+            "http": "GET",
+            "address": "/service/@id/webnic_dns/zone/@domain/subscription"
+        }
+    }
+}

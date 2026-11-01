@@ -140,7 +140,7 @@ class webnic_domain_controller extends HBController
 
     /**
      * Domain action dispatcher (SyncContact, ChangeEpp, Lock, Unlock, Hold,
-     * RemoveHold, SendVerify, Certificate, TaxLookup).
+     * RemoveHold, SendVerify, Certificate).
      */
     public function domainaction($params)
     {
@@ -178,8 +178,8 @@ class webnic_domain_controller extends HBController
                     $this->template->assign('domainid', (int) $params['id']);
                     $this->template->showtpl = $this->tplPath('ajax.certificate.tpl');
                     break;
-                case 'TaxLookup':
-                    $this->handleTaxLookup($params);
+                case 'Restore':
+                    $this->template->assign('message', $this->module->RestoreDomain() ? 'Domain restoration submitted.' : 'Restore failed.');
                     break;
                 default:
                     $this->template->assign('message', 'Unknown action.');
@@ -187,44 +187,6 @@ class webnic_domain_controller extends HBController
             }
         }
         $this->assignCommon($params);
-    }
-
-    /**
-     * Tax code lookup (Vietnamese MST) rendered into its own ajax pane.
-     */
-    protected function handleTaxLookup($params)
-    {
-        $id  = (int) $params['id'];
-        $mst = trim($params['mst'] ?? '');
-
-        $this->template->assign('domainid', $id);
-        $this->template->assign('taxid', $id);
-        $this->template->assign('mst', $mst);
-
-        if ($mst !== '') {
-            $url = 'https://tool.bnix.vn/wp-content/themes/blocksy-child/mst/check_mst.php?mst=' . urlencode($mst);
-            $ch  = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            $json = curl_exec($ch);
-            curl_close($ch);
-            $data = json_decode($json, true) ?: [];
-
-            // Mask the legal representative's ID number.
-            $repId = $data['legal_representative_id'] ?? '';
-            $len   = strlen($repId);
-            if ($len === 12) {
-                $data['legal_representative_id_masked'] = substr($repId, 0, 3) . str_repeat('X', $len - 5) . substr($repId, -2);
-            } elseif ($len === 9) {
-                $data['legal_representative_id_masked'] = substr($repId, 0, 3) . str_repeat('X', $len - 6) . substr($repId, -3);
-            } else {
-                $data['legal_representative_id_masked'] = $repId;
-            }
-
-            $this->template->assign('result', $data);
-        }
-
-        $this->template->showtpl = $this->tplPath('ajax.taxeslookup.tpl');
     }
 
     /**
@@ -238,8 +200,185 @@ class webnic_domain_controller extends HBController
             $this->template->showtpl = $this->tplPath('ajax.domaintransfer.tpl');
             $this->loadDomain($params['id']);
             $this->template->assign('transferinfo', $this->module->TransferAction($params));
+            $this->template->assign('transfertype', $this->module->queryTransferType());
             $this->template->assign('raa_date', Utilities::dateDisplay(date('Y-m-d H:i:s')));
         }
         $this->assignCommon($params);
+    }
+
+    /**
+     * DNSSEC management panel (view/update/delete DS records).
+     */
+    public function dnssec($params)
+    {
+        $this->template->assign('custom_template', $this->tplPath('domaindetails.tpl'));
+
+        if (Controller::isAjax() && $params['token_valid'] && $params['load']) {
+            $this->loadDomain($params['id']);
+
+            $do = $params['do'] ?? '';
+            if ($do === 'update') {
+                $dsDatas = [];
+                foreach ((array) ($params['keyTag'] ?? []) as $i => $keyTag) {
+                    if ($keyTag === '') {
+                        continue;
+                    }
+                    $dsDatas[] = [
+                        'keyTag'     => $keyTag,
+                        'algorithm'  => $params['algorithm'][$i] ?? '',
+                        'digestType' => $params['digestType'][$i] ?? '',
+                        'digest'     => $params['digest'][$i] ?? '',
+                    ];
+                }
+                $this->module->updateDnssec($dsDatas);
+            } elseif ($do === 'delete') {
+                $this->module->deleteDnssec();
+            }
+
+            $this->template->showtpl = $this->tplPath('ajax.dnssec.tpl');
+            $this->template->assign('domainid', (int) $params['id']);
+            $this->template->assign('supported', $this->module->checkDnssecSupported());
+            $this->template->assign('dsDatas', $this->module->getDnssecInfo());
+        }
+        $this->assignCommon($params);
+    }
+
+    /**
+     * Universal WHOIS lookup panel.
+     */
+    public function whoislookup($params)
+    {
+        $this->template->assign('custom_template', $this->tplPath('domaindetails.tpl'));
+
+        if (Controller::isAjax() && $params['token_valid'] && $params['load']) {
+            $this->loadDomain($params['id']);
+            $this->template->showtpl = $this->tplPath('ajax.whois.tpl');
+            $this->template->assign('whois', $this->module->getUniversalWhois());
+        }
+        $this->assignCommon($params);
+    }
+
+    /**
+     * Transfer-away status panel (registrar + reseller), with approve/reject.
+     */
+    public function transferaway($params)
+    {
+        $this->template->assign('custom_template', $this->tplPath('domaindetails.tpl'));
+
+        if (Controller::isAjax() && $params['token_valid'] && $params['load']) {
+            $this->loadDomain($params['id']);
+
+            if (($params['do'] ?? '') === 'update') {
+                $scope   = $params['scope'] ?? 'registrar';
+                $recid   = $params['recid'] ?? '';
+                $type    = $params['approveType'] ?? 'registrant';
+                $approve = ($params['approve'] ?? '') === '1';
+                $remarks = $params['approveRemarks'] ?? '';
+                if ($scope === 'reseller') {
+                    $this->module->updateResellerTransferAwayStatus($recid, $type, $approve, $remarks);
+                } else {
+                    $this->module->updateRegistrarTransferAwayStatus($recid, $type, $approve, $remarks);
+                }
+            }
+
+            $domainName = $this->module->apiDomainName();
+            $this->template->showtpl = $this->tplPath('ajax.transferaway.tpl');
+            $this->template->assign('domainid', (int) $params['id']);
+            $this->template->assign('domainname', $domainName);
+            $this->template->assign('registrar', $this->module->getRegistrarTransferAwayStatus($domainName));
+            $this->template->assign('reseller', $this->module->getResellerTransferAwayStatus($domainName));
+        }
+        $this->assignCommon($params);
+    }
+
+    /**
+     * Standalone admin tool: registrant account create / search / reassign.
+     */
+    public function registrant($params)
+    {
+        $this->prepareStandalonePage('registrant.tpl');
+
+        if (($params['do'] ?? '') === 'create') {
+            $data = $this->module->createRegistrantAccount($params['username'] ?? '');
+            $this->template->assign('created', $data);
+        } elseif (($params['do'] ?? '') === 'search') {
+            $this->template->assign('results', $this->module->listRegistrantAccounts($params['keyword'] ?? ''));
+            $this->template->assign('keyword', $params['keyword'] ?? '');
+        } elseif (($params['do'] ?? '') === 'reassign') {
+            $ok = $this->module->reassignRegistrantAccount($params['domainName'] ?? '', $params['registrantUsername'] ?? '');
+            $this->template->assign('reassigned', $ok);
+        }
+    }
+
+    /**
+     * Standalone admin tool: list domains linked to a nameserver/host.
+     */
+    public function hostdomains($params)
+    {
+        $this->prepareStandalonePage('hostdomains.tpl');
+
+        if (!empty($params['nameserver'])) {
+            $page     = (int) ($params['page'] ?? 1);
+            $pageSize = (int) ($params['pageSize'] ?? 50);
+            $this->template->assign('nameserver', $params['nameserver']);
+            $this->template->assign('items', $this->module->getHostLinkedDomains($params['nameserver'], $page, $pageSize));
+        }
+    }
+
+    /**
+     * Standalone admin tool: bulk operations + batch report lookup.
+     */
+    public function bulk($params)
+    {
+        $this->prepareStandalonePage('bulk.tpl');
+
+        $do = $params['do'] ?? '';
+        if ($do === 'register' && !empty($params['registrations'])) {
+            $list = json_decode((string) $params['registrations'], true);
+            if (is_array($list)) {
+                $this->template->assign('taskId', $this->module->bulkRegister($list));
+            } else {
+                $this->template->assign('taskId', false);
+            }
+        } elseif ($do === 'renew' && !empty($params['renewals'])) {
+            $list = [];
+            foreach (preg_split('/\r\n|\r|\n/', (string) $params['renewals']) as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                $parts = preg_split('/[\s,]+/', $line);
+                $list[] = ['domainName' => $parts[0], 'term' => (int) ($parts[1] ?? 1)];
+            }
+            $this->template->assign('taskId', $this->module->bulkRenew($list));
+        } elseif ($do === 'report' && !empty($params['taskId'])) {
+            $this->template->assign('overview', $this->module->getBulkReportOverview($params['taskId']));
+            $this->template->assign('details', $this->module->getBulkReportDetails($params['taskId']));
+            $this->template->assign('taskId', $params['taskId']);
+        } elseif ($do === 'replace' && !empty($params['domains'])) {
+            $domains = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $params['domains'])));
+            $map = [];
+            foreach (['registrant', 'administrator', 'technical', 'billing'] as $t) {
+                if (!empty($params[$t])) {
+                    $map[$t] = $params[$t];
+                }
+            }
+            $this->template->assign('jobOrderId', $this->module->bulkReplaceContact($domains, $map));
+        }
+    }
+
+    /**
+     * Shared setup for a standalone (non-domain-scoped) admin page.
+     */
+    protected function prepareStandalonePage($file)
+    {
+        $modDir = strtolower($this->module->getModuleDirName());
+        $this->template->pageTitle = Language::parse($this->module->getModName());
+        $this->template->module_template_dir = APPDIR_MODULES . 'Domain' . DS . $modDir . DS . 'admin';
+        $this->template->showtpl = $this->tplPath($file);
+        $this->template->assign('moduleurl', Utilities::checkSecureURL(HBConfig::getConfig('InstallURL') . 'includes/modules/Domain/' . $modDir . '/admin/'));
+        $this->template->assign('modulename', $this->module->getModuleName());
+        $this->template->assign('modname', $this->module->getModName());
+        $this->template->assign('moduleid', $this->module->getModuleId());
     }
 }

@@ -3,9 +3,10 @@
 <div id="newshelfnav" class="newhorizontalnav">
     <div class="list-1">
         <ul>
-            <li class="active">
-                <a href="?cmd={$modulename}"><span>Status</span></a>
-            </li>
+            <li class="active"><a href="?cmd={$modulename}"><span>Status</span></a></li>
+            <li><a href="?cmd={$modulename}&action=registrant"><span>Registrant Accounts</span></a></li>
+            <li><a href="?cmd={$modulename}&action=hostdomains"><span>Host Domains</span></a></li>
+            <li><a href="?cmd={$modulename}&action=bulk"><span>Bulk</span></a></li>
         </ul>
     </div>
 </div>

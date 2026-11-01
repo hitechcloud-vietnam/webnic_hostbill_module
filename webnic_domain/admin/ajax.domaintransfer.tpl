@@ -1,3 +1,9 @@
+{if $transfertype}
+    <div class="alert alert-info" style="margin-bottom:8px;">
+        Transfer type: <strong>{$transfertype}</strong>
+        {if $transfertype == 'domain_owner'} (domain is already in this account){/if}
+    </div>
+{/if}
 {if $transferinfo}
 <table class="table table-hover">
     <tbody>
