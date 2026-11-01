@@ -33,12 +33,17 @@ Before enabling customer orders, confirm all of the following:
 - Verify a test registration or transfer using a valid synthetic registrant and provider-approved test conditions.
 - Check nameserver/contact synchronization and status refresh.
 - Test DNSSEC, lock/hold, renewal, restore, or other destructive/stateful features only when the OTE account and test domain support them.
+- Test registrar transfer-in status reads and reseller-transfer submission separately. Submit only an approved OTE test handover; a reseller handover is not the same workflow as transfer-away approval.
+- Distinguish registry suspension (`domainSuspend()`) from hold nameservers (`Suspended()`) and verify the provider's resulting status before restoring service.
+- Before using `toggleProxyService()`, confirm TLD eligibility, current provider subscription/pricing, and whether the intended action is subscribe or unsubscribe. Do not treat it as the separate WHOIS privacy switch.
+- Check glue-host availability with the intended extension before registering a nameserver host.
 - Confirm whether the `hb_domain_contacts` table exists before applying the install SQL; preserve existing table contents.
 
 ### DNS
 
 - Create or import a test zone and confirm the resulting zone belongs to the expected basic or premium tier.
 - Add, read, update, and remove a test record; verify values and TTL against WebNIC.
+- `deleteZoneRecordUnified()` is an internal helper that removes all values matching a zone/type/name pair. It is not the ordinary client/admin delete path; use a disposable zone and verify the exact match before testing it.
 - Test DNSSEC and forwarding only on a test zone. Confirm premium subscription and auto-renewal state before changing it.
 - Check user API route registration and verify an owning client can access its service while a different client is denied.
 
@@ -47,6 +52,7 @@ Before enabling customer orders, confirm all of the following:
 - Select a test product and supported DCV method; verify CSR, contacts, SAN rules, and organization requirements.
 - Complete a test DNS, HTTP/file, or email validation workflow as appropriate.
 - Verify status synchronization and download only after issuance.
+- Keep backend helpers such as reseller-wide order search and provider contact/organization changes in trusted operator workflows; verify their scope and shared-data impact before production use.
 - Treat renewal, reissue, and termination as separate lifecycle operations; verify WebNIC order state before repeating an operation after a timeout.
 
 ## Routine operations
@@ -69,7 +75,7 @@ For a timeout, HTTP 5xx, or lost response after a mutating action:
 4. If provider state is unclear, contact WebNIC before retrying or changing local records.
 5. Reconcile HostBill and provider state using the documented module workflow; preserve evidence and notify affected operators/customers as required.
 
-This is especially important for domain registration/transfer/renewal/restore/deletion, DNS subscription changes, and SSL order/reissue/renewal/termination.
+This is especially important for domain registration/transfer/renewal/restore/deletion, registry suspension, proxy subscription changes, DNS record deletion by type/name and DNS subscription changes, and SSL order/reissue/renewal/termination or contact/organization updates.
 
 ## Upgrade and rollback procedure
 

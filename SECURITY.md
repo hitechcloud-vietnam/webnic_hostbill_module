@@ -47,6 +47,16 @@ DNS and SSL expose User API manifests; the Domain module does not declare its ow
 
 Use separate API credentials per integration where possible, grant only the needed scopes/permissions, protect them as secrets, rotate them after staff or integration changes, and monitor failed/abnormal access. Avoid publishing API routes through unauthenticated proxies, caches, or browser code that exposes credentials.
 
+### Backend helpers and high-impact operations
+
+Some module methods are callable by trusted HostBill code but are not currently exposed as customer User API routes or admin-panel actions. Adding a PHP method does not automatically add authentication, service ownership checks, operator confirmation, audit context, or billing behavior. Any future caller must provide those controls at its own boundary.
+
+- Domain `submitResellerTransfer()` changes provider-side ownership/reseller workflow; do not confuse it with registrar transfer-in or transfer-away approval. `domainSuspend()` changes registry status and can make a domain unreachable; it is not the same as switching to hold nameservers. `toggleProxyService()` changes a provider proxy subscription and may affect the service's price/renewal state.
+- DNS `deleteZoneRecordUnified()` removes every record value for a zone/type/name pair, not just one value. Use only after confirming the exact zone and owner/name, preferably first on a disposable OTE zone.
+- SSL `searchOrders()` can return reseller-account order data beyond a single HostBill service. `deleteSslContact()` and `updateOrganizationContact()` can change shared provider-side data. Keep these helpers restricted to trusted operator workflows; do not expose them broadly without explicit authorization, scope checks, and audit controls.
+
+For all remote mutations, verify provider state before retrying after an ambiguous timeout. Add an approval/change-control step proportional to the operation's impact.
+
 ### Logs and diagnostics
 
 - Avoid enabling verbose/debug logging in production except for a time-limited, approved investigation.

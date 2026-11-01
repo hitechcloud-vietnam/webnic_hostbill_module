@@ -167,6 +167,29 @@ Every WebNIC endpoint the module calls (paths relative to the environment base):
 | `GET domain/v2/bulk/report` | `getBulkReportOverview()` |
 | `POST domain/v2/bulk/report/{taskId}/details/list` | `getBulkReportDetails()` |
 
+### New backend helpers
+
+The following methods bind additional WebNIC endpoints for trusted HostBill
+code or operator tooling. They are module methods, not new customer User API
+routes or automatic admin-panel actions:
+
+* `submitResellerTransfer()` submits a WebNIC **reseller-to-reseller** domain
+  handover. This is distinct from an external registrar transfer-in and from
+  the transfer-away approval/status operations above.
+* `getTransferInStatus()` / `getTransferInStatusById()` read registrar
+  transfer-in status by domain name or provider record ID.
+* `domainSuspend()` applies registry-level suspension (`clientHold`), while
+  `Suspended()` changes nameservers to the local hold nameservers. They are
+  separate controls with different customer impact.
+* `toggleProxyService()` subscribes or unsubscribes the WebNIC proxy service;
+  this is distinct from the WHOIS privacy toggle. Confirm TLD eligibility,
+  provider pricing, and the intended subscription state before changing it.
+* `checkHost()` checks nameserver/glue-host availability for an extension.
+
+These bindings call WebNIC directly; they do not add authorization, approval,
+or billing workflows to HostBill by themselves. Restrict any caller that uses
+them and verify provider-side state before retrying a timed-out mutation.
+
 ---
 
 ## Admin UI

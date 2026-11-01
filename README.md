@@ -2,11 +2,11 @@
 
 Bộ tích hợp HostBill với dịch vụ WebNIC, được tổ chức thành ba module độc lập:
 
-| Module | Loại HostBill | Phạm vi |
-| --- | --- | --- |
-| [`webnic_domain`](webnic_domain/README.md) | Domain registrar | Đăng ký và quản lý tên miền qua WebNIC REST v2. |
-| [`webnic_dns`](webnic_dns/README.md) | Hosting / DNS | DNS cơ bản và premium, DNSSEC, forwarding, subscription và API cho khách hàng. |
-| [`webnic_ssl`](webnic_ssl/README.md) | Hosting / SSL | Đặt và quản lý chứng chỉ, xác minh DCV, CSR và tải chứng chỉ. |
+| Module | Loại HostBill | Version metadata | Phạm vi |
+| --- | --- | --- | --- |
+| [`webnic_domain`](webnic_domain/README.md) | Domain registrar | `1.2026-11-02.2` | Đăng ký và quản lý tên miền qua WebNIC REST v2. |
+| [`webnic_dns`](webnic_dns/README.md) | Hosting / DNS | `1.1.0` | DNS cơ bản và premium, DNSSEC, forwarding, subscription và API cho khách hàng. |
+| [`webnic_ssl`](webnic_ssl/README.md) | Hosting / SSL | `1.1.0` | Đặt và quản lý chứng chỉ, xác minh DCV, CSR và tải chứng chỉ. |
 
 Các module được triển khai riêng; việc cài một module không tự động cài hai module còn lại. Xem [hướng dẫn cài đặt](docs/INSTALLATION.md) trước khi triển khai.
 

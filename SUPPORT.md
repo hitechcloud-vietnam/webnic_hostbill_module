@@ -46,7 +46,7 @@ Start with the least risky checks:
 4. Compare the HostBill state with WebNIC's authoritative order/domain/zone state before retrying a create, transfer, delete, renewal, reissue, or subscription action.
 5. If the failure remains, open an issue with the checklist above and a sanitized error trace.
 
-Do not repeatedly retry a mutating operation to clear an ambiguous timeout. First inspect remote state; duplicate registration, transfer, renewal, certificate, or subscription actions may have external consequences.
+Do not repeatedly retry a mutating operation to clear an ambiguous timeout. First inspect remote state; duplicate registration, reseller transfer, renewal, registry suspension, proxy subscription, DNS deletion, certificate, or shared contact/organization changes may have external consequences.
 
 ## Triage categories
 
