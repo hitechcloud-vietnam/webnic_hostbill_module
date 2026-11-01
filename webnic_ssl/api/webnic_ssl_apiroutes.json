@@ -1,0 +1,158 @@
+{
+    "file": "includes/modules/Hosting/webnic_ssl/api/class.webnic_ssl_apiroutes.php",
+    "class": "webnic_ssl_apiroutes",
+    "name": "WebNIC SSL",
+    "description": "REST routes a client can drive for a WebNIC SSL certificate service: read-only status, supported validation methods and issued-certificate download",
+    "category": [
+        {
+            "name": "WebNIC SSL",
+            "description": "WebNIC SSL certificates resold through this installation"
+        }
+    ],
+    "route": {
+        "GET /service/@id/webnic_ssl/status": {
+            "name": "Certificate Status",
+            "description": "Synchronize and return the certificate order status for the service",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/status",
+            "auth": true,
+            "handle": "status",
+            "uuid": "eb040001-aa04-4c04-9e04-000000000001",
+            "priority": 10,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/status"
+        },
+        "GET /service/@id/webnic_ssl/dcv-methods": {
+            "name": "Supported DCV Methods",
+            "description": "Domain Control Validation methods this certificate product supports",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/dcv-methods",
+            "auth": true,
+            "handle": "dcvMethods",
+            "uuid": "eb040002-aa04-4c04-9e04-000000000002",
+            "priority": 20,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/dcv-methods"
+        },
+        "GET /service/@id/webnic_ssl/certificate": {
+            "name": "Download Certificate",
+            "description": "The issued certificate (PEM chain) for the service, when available",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/certificate",
+            "auth": true,
+            "handle": "certificate",
+            "uuid": "eb040003-aa04-4c04-9e04-000000000003",
+            "priority": 30,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/certificate"
+        },
+        "GET /service/@id/webnic_ssl/auth-info": {
+            "name": "Validation Details",
+            "description": "Per-method domain-control-validation details (DNS records, HTTP file, email approvers) for the order",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/auth-info",
+            "auth": true,
+            "handle": "authInfo",
+            "uuid": "eb040004-aa04-4c04-9e04-000000000004",
+            "priority": 40,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/auth-info"
+        },
+        "GET /service/@id/webnic_ssl/dcv-status": {
+            "name": "DCV Status",
+            "description": "Current domain-control-validation status for the certificate order",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/dcv-status",
+            "auth": true,
+            "handle": "dcvStatus",
+            "uuid": "eb040005-aa04-4c04-9e04-000000000005",
+            "priority": 50,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/dcv-status"
+        },
+        "POST /service/@id/webnic_ssl/change-dcv-method": {
+            "name": "Change DCV Method",
+            "description": "Switch the order's domain-control-validation method (dns, file or email)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "method", "description": "Target DCV method (dns, http/file or email)", "required": true},
+                {"type": "string", "name": "email", "description": "Approver email (required when switching to email validation)", "required": false}
+            ],
+            "route": "POST /service/@id/webnic_ssl/change-dcv-method",
+            "auth": true,
+            "handle": "changeDcvMethod",
+            "uuid": "eb040006-aa04-4c04-9e04-000000000006",
+            "priority": 60,
+            "category": "WebNIC SSL",
+            "http": "POST",
+            "address": "/service/@id/webnic_ssl/change-dcv-method"
+        },
+        "POST /service/@id/webnic_ssl/resend-approver-email": {
+            "name": "Resend Approver Email",
+            "description": "Re-send the domain-control-validation approver email for every email-validated domain on the order",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "POST /service/@id/webnic_ssl/resend-approver-email",
+            "auth": true,
+            "handle": "resendApproverEmail",
+            "uuid": "eb040007-aa04-4c04-9e04-000000000007",
+            "priority": 70,
+            "category": "WebNIC SSL",
+            "http": "POST",
+            "address": "/service/@id/webnic_ssl/resend-approver-email"
+        },
+        "GET /service/@id/webnic_ssl/csr": {
+            "name": "Decode CSR",
+            "description": "Decode the CSR stored on the service into its subject fields (common name, organization, SANs, hashes)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true}
+            ],
+            "route": "GET /service/@id/webnic_ssl/csr",
+            "auth": true,
+            "handle": "decodeCsr",
+            "uuid": "eb040008-aa04-4c04-9e04-000000000008",
+            "priority": 80,
+            "category": "WebNIC SSL",
+            "http": "GET",
+            "address": "/service/@id/webnic_ssl/csr"
+        },
+        "POST /service/@id/webnic_ssl/generate-csr": {
+            "name": "Generate CSR",
+            "description": "Generate a CSR and private key server-side for the service (defaults to the service domain and stored organization details)",
+            "param": [
+                {"type": "int", "name": "id", "description": "HostBill service ID", "inurl": true, "required": true},
+                {"type": "string", "name": "commonName", "description": "Common name (defaults to the service domain)", "required": false},
+                {"type": "string", "name": "country", "description": "2-letter ISO country code", "required": false},
+                {"type": "string", "name": "state", "description": "State/province", "required": false},
+                {"type": "string", "name": "locality", "description": "Locality/city", "required": false},
+                {"type": "string", "name": "organizationName", "description": "Organization name", "required": false},
+                {"type": "int", "name": "keySize", "description": "RSA key size (2048 or 4096)", "required": false},
+                {"type": "array", "name": "sanfield", "description": "Subject Alternative Names (defaults to the stored SAN list)", "required": false}
+            ],
+            "route": "POST /service/@id/webnic_ssl/generate-csr",
+            "auth": true,
+            "handle": "generateCsr",
+            "uuid": "eb040009-aa04-4c04-9e04-000000000009",
+            "priority": 90,
+            "category": "WebNIC SSL",
+            "http": "POST",
+            "address": "/service/@id/webnic_ssl/generate-csr"
+        }
+    }
+}
