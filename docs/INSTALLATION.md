@@ -7,6 +7,8 @@
 3. Obtain a WebNIC reseller/API account and access to the OTE environment. Confirm API permissions and product availability with WebNIC.
 4. Back up the HostBill database and the existing module directories.
 
+For public module ZIPs, download the desired module asset from its [GitHub Release](RELEASING.md#download-and-install) and extract it at the HostBill installation root. The archive already contains the `includes/modules/...` prefix; do not extract it inside `includes/modules/` or you will create a duplicated path.
+
 ## Copy module files
 
 Copy each selected module directory, preserving its internal structure, into the matching HostBill module directory:

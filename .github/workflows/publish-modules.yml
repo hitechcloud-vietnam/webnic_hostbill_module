@@ -1,0 +1,73 @@
+name: Publish module releases
+
+on:
+  push:
+    tags:
+      - 'webnic_domain-v*'
+      - 'webnic_dns-v*'
+      - 'webnic_ssl-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: none
+
+      - name: Check PHP syntax and JSON manifests
+        run: |
+          find webnic_domain webnic_dns webnic_ssl -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          find webnic_domain webnic_dns webnic_ssl -type f -name '*.json' -print0 | xargs -0 -n1 python3 -m json.tool --no-ensure-ascii
+
+      - name: Package tagged module
+        id: package
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          module="${RELEASE_TAG%-v*}"
+          case "$module" in
+            webnic_domain|webnic_dns|webnic_ssl) ;;
+            *) printf 'Unsupported release tag: %s\n' "$RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          version="${RELEASE_TAG#"$module"-v}"
+          test -n "$version"
+          archive="$(./scripts/package-module.sh "$module" dist "$version")"
+          echo "module=$module" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package layout
+        env:
+          MODULE: ${{ steps.package.outputs.module }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        run: |
+          set -euo pipefail
+          case "$MODULE" in
+            webnic_domain) destination='includes/modules/Domain/webnic_domain/' ;;
+            webnic_dns|webnic_ssl) destination="includes/modules/Hosting/$MODULE/" ;;
+          esac
+          unzip -t "$ARCHIVE"
+          files="$(unzip -Z1 "$ARCHIVE" | grep -v '/$')"
+          test -n "$files"
+          if printf '%s\n' "$files" | grep -v "^$destination"; then
+            printf 'Unexpected path in %s\n' "$ARCHIVE" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODULE: ${{ steps.package.outputs.module }}
+          VERSION: ${{ steps.package.outputs.version }}
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+        run: gh release create "$GITHUB_REF_NAME" "$ARCHIVE" --title "$MODULE $VERSION" --generate-notes

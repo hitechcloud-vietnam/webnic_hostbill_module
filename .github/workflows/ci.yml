@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: none
+
+      - name: Check PHP syntax
+        run: find webnic_domain webnic_dns webnic_ssl -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Validate JSON manifests
+        run: find webnic_domain webnic_dns webnic_ssl -type f -name '*.json' -print0 | xargs -0 -n1 python3 -m json.tool --no-ensure-ascii
+
+      - name: Build module archives
+        run: |
+          mkdir -p dist
+          ./scripts/package-module.sh webnic_domain dist
+          ./scripts/package-module.sh webnic_dns dist
+          ./scripts/package-module.sh webnic_ssl dist
+
+      - name: Verify archive layout
+        run: |
+          set -euo pipefail
+          for module in webnic_domain webnic_dns webnic_ssl; do
+            case "$module" in
+              webnic_domain) destination='includes/modules/Domain/webnic_domain/' ;;
+              *) destination="includes/modules/Hosting/$module/" ;;
+            esac
+            archive="$(find dist -maxdepth 1 -type f -name "$module-*.zip" -print -quit)"
+            test -n "$archive"
+            unzip -t "$archive"
+            files="$(unzip -Z1 "$archive" | grep -v '/$')"
+            test -n "$files"
+            if printf '%s\n' "$files" | grep -v "^$destination"; then
+              printf 'Unexpected path in %s\n' "$archive" >&2
+              exit 1
+            fi
+          done
+
+      - name: Upload module archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: webnic-hostbill-module-zips
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30

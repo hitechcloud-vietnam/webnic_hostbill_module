@@ -12,6 +12,7 @@ Các module được triển khai riêng; việc cài một module không tự �
 
 ## Tài liệu
 
+- [CI/CD, đóng gói ZIP và phát hành module](docs/RELEASING.md)
 - [Cài đặt và cấu hình chung](docs/INSTALLATION.md)
 - [Vận hành production và xử lý sự cố](docs/OPERATIONS.md)
 - [Chính sách hỗ trợ và mẫu ticket](SUPPORT.md)
