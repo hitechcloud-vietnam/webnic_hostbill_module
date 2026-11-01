@@ -1,0 +1,8 @@
+/* webnic_domain admin styles */
+.webnic-domain-panel { max-width: 760px; }
+#domreq-details { margin: 10px 0; }
+#domreq-details .btn { margin: 2px 2px 6px 0; }
+#domreq-status, #domreq-transfer { margin-top: 12px; }
+.webnic-domain-action-result { padding: 8px 0; }
+ul.accor { list-style: none; margin: 0; padding: 0; }
+ul.accor > li { margin-bottom: 10px; }
