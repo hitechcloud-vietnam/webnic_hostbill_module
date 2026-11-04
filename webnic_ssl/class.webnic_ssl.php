@@ -26,7 +26,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.1.0
+ * @version   1.1.1
  */
 class webnic_ssl extends SSLModule
 {
@@ -37,7 +37,7 @@ class webnic_ssl extends SSLModule
      */
     protected $info = ["haveuser" => true, "haveadmin" => true, "havetpl" => true, "haveapi" => true];
 
-    protected $version = '1.1.0';
+    protected $version = '1.1.1';
     protected $_repository = 'hosting_webnic_ssl';
     protected $modname = 'WebNIC SSL';
     protected $description = 'WebNIC SSL provisioning module for HostBill';
@@ -194,6 +194,10 @@ class webnic_ssl extends SSLModule
     const TOKEN_CACHE_PREFIX = 'webnic_ssl.token.';
     const PRODUCT_CACHE_PREFIX = 'webnic_ssl.products.';
     const RULE_CACHE_PREFIX = 'webnic_ssl.rules.';
+    /** Negative-cache marker set after a transport failure, so repeated admin
+     *  renders fast-fail instead of each waiting out a fresh connect timeout. */
+    const DOWN_CACHE_PREFIX = 'webnic_ssl.down.';
+    const DOWN_CACHE_TTL = 45;
 
     // ------------------------------------------------------------------
     // SSLModule lifecycle / discovery
@@ -288,9 +292,26 @@ class webnic_ssl extends SSLModule
 
             return $list;
         } catch (Exception $e) {
+            // Degrade gracefully: never block or clear the admin select when the
+            // WebNIC API is unreachable — keep the saved product so the product
+            // configuration is not silently lost, and surface a clear notice.
             $this->addError($e->getMessage());
-            return false;
+            return $this->savedProductFallbackList();
         }
+    }
+
+    /**
+     * Fallback loadable list used when the WebNIC product catalogue cannot be
+     * fetched: retains the currently saved product_key (if any) as the sole
+     * option so the admin select does not lose the configured choice.
+     */
+    protected function savedProductFallbackList()
+    {
+        $saved = trim((string) ($this->options['product_key']['value'] ?? ''));
+        if ($saved === '') {
+            return [];
+        }
+        return [[$saved, $saved . ' (saved — WebNIC API unreachable)']];
     }
 
     /** Loadable-multiple source for the DCV option, and the API dcv-methods route. */
@@ -1454,7 +1475,7 @@ class webnic_ssl extends SSLModule
             return $list;
         } catch (Exception $e) {
             $this->addError($e->getMessage());
-            return false;
+            return $this->savedProductFallbackList();
         }
     }
 
@@ -1665,7 +1686,13 @@ class webnic_ssl extends SSLModule
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_TIMEOUT => 90,
+            // Fail fast when the WebNIC host is unreachable (IP not whitelisted,
+            // firewall dropping outbound) so a loadable admin select never
+            // blocks the page: cap the connect phase, keep signals off for
+            // threaded SAPIs, and bound the whole interactive call.
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_NOSIGNAL => 1,
+            CURLOPT_TIMEOUT => 30,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HEADER => true,
         ];
@@ -1686,7 +1713,10 @@ class webnic_ssl extends SSLModule
         if ($raw === false) {
             $error = curl_error($curl);
             curl_close($curl);
-            throw new Exception('WebNIC connection error: ' . $error);
+            $message = 'Could not reach WebNIC API (' . $error . ') — check API credentials and that this server\'s outbound IP is whitelisted at WebNIC.';
+            $downKey = self::DOWN_CACHE_PREFIX . md5($this->getBaseUrl() . '|' . $this->getApiUsername());
+            HBCache::set($downKey, $message, self::DOWN_CACHE_TTL);
+            throw new Exception($message);
         }
 
         $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -1726,10 +1756,17 @@ class webnic_ssl extends SSLModule
     protected function getAccessToken($force = false)
     {
         $cacheKey = self::TOKEN_CACHE_PREFIX . md5($this->getBaseUrl() . '|' . $this->getApiUsername());
+        $downKey = self::DOWN_CACHE_PREFIX . md5($this->getBaseUrl() . '|' . $this->getApiUsername());
         if (!$force) {
             $cached = HBCache::get($cacheKey);
             if (is_string($cached) && $cached !== '') {
                 return $cached;
+            }
+            // Short-circuit while a recent transport failure is still cached, so
+            // the admin page does not incur another connect-timeout wait.
+            $down = HBCache::get($downKey);
+            if (is_string($down) && $down !== '') {
+                throw new Exception($down);
             }
         }
 
@@ -1737,7 +1774,9 @@ class webnic_ssl extends SSLModule
         curl_setopt_array($curl, [
             CURLOPT_URL => rtrim($this->getBaseUrl(), '/') . self::TOKEN_PATH,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_NOSIGNAL => 1,
+            CURLOPT_TIMEOUT => 20,
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
@@ -1753,7 +1792,9 @@ class webnic_ssl extends SSLModule
         if ($raw === false) {
             $error = curl_error($curl);
             curl_close($curl);
-            throw new Exception('WebNIC token request failed: ' . $error);
+            $message = 'Could not reach WebNIC API (' . $error . ') — check API credentials and that this server\'s outbound IP is whitelisted at WebNIC.';
+            HBCache::set($downKey, $message, self::DOWN_CACHE_TTL);
+            throw new Exception($message);
         }
 
         $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
@@ -1776,6 +1817,7 @@ class webnic_ssl extends SSLModule
 
         $ttl = max(300, ((int) ($decoded['data']['expires_in'] ?? 3600)) - 60);
         HBCache::set($cacheKey, $token, $ttl);
+        HBCache::delete($downKey);
         return $token;
     }
 
