@@ -189,6 +189,12 @@ No cancel/terminate is exposed over the API.
 
 ## Changelog
 
+* **1.1.1**
+  * Bound connection and request durations and cache transport failures for 45
+    seconds, with an actionable WebNIC connectivity error.
+  * Preserve the saved product selection when the product catalogue cannot be
+    fetched.
+
 * **1.1.0**
   * Docs/license pass: MIT `LICENSE`, author/license headers, this README.
   * Added the admin service management UI (controller + `myadminarea.tpl`).

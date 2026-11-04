@@ -236,6 +236,12 @@ All mutating admin actions dispatch through `handleWebnicAction()` on POST.
 
 ## Changelog
 
+* **1.1.1**
+  * Bound connection and request durations for token and API calls to prevent
+    unavailable WebNIC endpoints from blocking admin pages.
+  * Cache transport failures for 45 seconds, return an actionable error, and
+    clear the failure marker after successful authentication.
+
 * **1.1.0**
   * Docs/license pass: MIT `LICENSE`, author/license headers, this README.
   * Gap-fill against WebNIC apidocs: `deleteZoneRecordUnified()`

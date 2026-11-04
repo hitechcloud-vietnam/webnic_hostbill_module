@@ -273,6 +273,10 @@ reseller account balance (token-checked submit only; never on plain render).
 
 ## Changelog
 
+* **1.2026-11-03.1**
+  * Set 10-second connection and 30-second request timeouts for WebNIC API
+    calls so unreachable endpoints cannot indefinitely block admin pages.
+
 * **1.2026-11-02.2**
   * Docs/license pass: MIT `LICENSE`, author/license headers, this README.
   * Gap-fill against WebNIC apidocs: `submitResellerTransfer()`,

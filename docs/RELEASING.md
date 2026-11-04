@@ -36,9 +36,9 @@ webnic_ssl-v<exact module version>
 Examples for the current source metadata:
 
 ```text
-webnic_domain-v1.2026-11-02.2
-webnic_dns-v1.1.0
-webnic_ssl-v1.1.0
+webnic_domain-v1.2026-11-03.1
+webnic_dns-v1.1.1
+webnic_ssl-v1.1.1
 ```
 
 Before tagging, update the selected module's `$version` in its main PHP class, review the module README/changelog and license, and merge the change to the default branch. Create and push a tag that exactly matches that version:
