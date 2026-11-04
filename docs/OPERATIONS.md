@@ -1,5 +1,7 @@
 # Production Operations Runbook
 
+[English](OPERATIONS.md) | [Tiếng Việt](OPERATIONS.vi.md)
+
 This runbook covers routine operations for WebNIC Domain, DNS, and SSL modules installed in HostBill. Provider-side state in WebNIC is authoritative for completed orders and remote DNS/domain/certificate operations; HostBill state can be delayed or incomplete.
 
 ## Production readiness

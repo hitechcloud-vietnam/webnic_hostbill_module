@@ -1,5 +1,7 @@
 # Contributing
 
+[English](CONTRIBUTING.md) | [Tiếng Việt](CONTRIBUTING.vi.md)
+
 ## Scope
 
 Keep changes focused on the relevant module or documentation. Domain, DNS, and SSL are separate HostBill modules; avoid introducing runtime dependencies between them unless the change explicitly requires it.

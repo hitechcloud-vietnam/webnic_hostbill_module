@@ -23,7 +23,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.2026-11-03.1
+ * @version   1.2026-11-04.1
  */
 
 use Domain\webnic_domain\ORM\ORM_domcontacts as DContacts;
@@ -58,7 +58,7 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
      * Module version. Bump on every feature change so HostBill re-reads the contract.
      * @var string
      */
-    protected $version = '1.2026-11-03.1';
+    protected $version = '1.2026-11-04.1';
 
     /**
      * Module name, visible in admin portal.

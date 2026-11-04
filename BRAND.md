@@ -1,5 +1,7 @@
 # Brand and Attribution
 
+[English](BRAND.md) | [Tiếng Việt](BRAND.vi.md)
+
 ## Project identity
 
 - Project name: **WebNIC Modules for HostBill**.

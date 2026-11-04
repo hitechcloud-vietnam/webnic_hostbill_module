@@ -1,5 +1,7 @@
 # WebNIC SSL (`webnic_ssl`)
 
+[English](README.md) | [Tiếng Việt](README.vi.md)
+
 HostBill **SSL provisioning** module for [WebNIC](https://www.webnic.cc/), built
 against the **WebNIC REST v2 API** (`ssl/v2/*`). Part of the HiTechCloud WebNIC
 Suite (`webnic_domain` / `webnic_ssl` / `webnic_dns`).
@@ -188,6 +190,9 @@ No cancel/terminate is exposed over the API.
 ---
 
 ## Changelog
+
+* **1.1.2**
+  * Added a complete Vietnamese translation alongside the English module guide.
 
 * **1.1.1**
   * Bound connection and request durations and cache transport failures for 45

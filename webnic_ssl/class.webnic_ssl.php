@@ -26,7 +26,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.1.1
+ * @version   1.1.2
  */
 class webnic_ssl extends SSLModule
 {
@@ -37,7 +37,7 @@ class webnic_ssl extends SSLModule
      */
     protected $info = ["haveuser" => true, "haveadmin" => true, "havetpl" => true, "haveapi" => true];
 
-    protected $version = '1.1.1';
+    protected $version = '1.1.2';
     protected $_repository = 'hosting_webnic_ssl';
     protected $modname = 'WebNIC SSL';
     protected $description = 'WebNIC SSL provisioning module for HostBill';

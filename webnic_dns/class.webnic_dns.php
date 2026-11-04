@@ -31,7 +31,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.1.1
+ * @version   1.1.2
  */
 #[\AllowDynamicProperties]
 class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
@@ -47,7 +47,7 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
      * Module version. Increase on every method change.
      * @var string
      */
-    protected $version = "1.1.1";
+    protected $version = "1.1.2";
 
     /**
      * Negative-cache marker + TTL (seconds) set after a transport failure, so

@@ -1,5 +1,7 @@
 # Security Policy
 
+[English](SECURITY.md) | [Tiếng Việt](SECURITY.vi.md)
+
 This document covers the WebNIC Domain, DNS, and SSL modules in this repository. It provides deployment guidance, not a security certification or a guarantee that every HostBill installation is secure.
 
 ## Reporting a vulnerability

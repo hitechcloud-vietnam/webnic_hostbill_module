@@ -1,5 +1,7 @@
 # WebNIC Domain (`webnic_domain`)
 
+[English](README.md) | [Tiếng Việt](README.vi.md)
+
 HostBill domain **registrar** module for [WebNIC](https://www.webnic.cc/), built
 from scratch against the **WebNIC REST v2 API**. Part of the HiTechCloud WebNIC
 Suite (`webnic_domain` / `webnic_ssl` / `webnic_dns`).
@@ -272,6 +274,9 @@ reseller account balance (token-checked submit only; never on plain render).
 ---
 
 ## Changelog
+
+* **1.2026-11-04.1**
+  * Added a complete Vietnamese translation alongside the English module guide.
 
 * **1.2026-11-03.1**
   * Set 10-second connection and 30-second request timeouts for WebNIC API

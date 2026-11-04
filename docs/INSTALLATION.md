@@ -1,5 +1,7 @@
 # Installation and Shared Configuration
 
+[English](INSTALLATION.md) | [Tiếng Việt](INSTALLATION.vi.md)
+
 ## Before installing
 
 1. Confirm that the target HostBill installation supports the module type: Domain for `webnic_domain`, Hosting/DNS for `webnic_dns`, and Hosting/SSL for `webnic_ssl`.

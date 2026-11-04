@@ -1,5 +1,7 @@
 # WebNIC DNS (`webnic_dns`)
 
+[English](README.md) | [Tiếng Việt](README.vi.md)
+
 HostBill **DNS** module for [WebNIC](https://www.webnic.cc/), built on the
 **WebNIC DNS v2 REST API** (`dns/v2/*`). Part of the HiTechCloud WebNIC Suite
 (`webnic_domain` / `webnic_ssl` / `webnic_dns`).
@@ -235,6 +237,9 @@ All mutating admin actions dispatch through `handleWebnicAction()` on POST.
 ---
 
 ## Changelog
+
+* **1.1.2**
+  * Added a complete Vietnamese translation alongside the English module guide.
 
 * **1.1.1**
   * Bound connection and request durations for token and API calls to prevent

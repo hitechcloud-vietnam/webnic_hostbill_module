@@ -1,24 +1,26 @@
 # WebNIC Modules for HostBill
 
+[Tiếng Việt](README.md) | [English](README.en.md)
+
 Bộ tích hợp HostBill với dịch vụ WebNIC, được tổ chức thành ba module độc lập:
 
 | Module | Loại HostBill | Version metadata | Phạm vi |
 | --- | --- | --- | --- |
-| [`webnic_domain`](webnic_domain/README.md) | Domain registrar | `1.2026-11-03.1` | Đăng ký và quản lý tên miền qua WebNIC REST v2. |
-| [`webnic_dns`](webnic_dns/README.md) | Hosting / DNS | `1.1.1` | DNS cơ bản và premium, DNSSEC, forwarding, subscription và API cho khách hàng. |
-| [`webnic_ssl`](webnic_ssl/README.md) | Hosting / SSL | `1.1.1` | Đặt và quản lý chứng chỉ, xác minh DCV, CSR và tải chứng chỉ. |
+| [`webnic_domain`](webnic_domain/README.md) ([VI](webnic_domain/README.vi.md)) | Domain registrar | `1.2026-11-04.1` | Đăng ký và quản lý tên miền qua WebNIC REST v2. |
+| [`webnic_dns`](webnic_dns/README.md) ([VI](webnic_dns/README.vi.md)) | Hosting / DNS | `1.1.2` | DNS cơ bản và premium, DNSSEC, forwarding, subscription và API cho khách hàng. |
+| [`webnic_ssl`](webnic_ssl/README.md) ([VI](webnic_ssl/README.vi.md)) | Hosting / SSL | `1.1.2` | Đặt và quản lý chứng chỉ, xác minh DCV, CSR và tải chứng chỉ. |
 
 Các module được triển khai riêng; việc cài một module không tự động cài hai module còn lại. Xem [hướng dẫn cài đặt](docs/INSTALLATION.md) trước khi triển khai.
 
 ## Tài liệu
 
-- [CI/CD, đóng gói ZIP và phát hành module](docs/RELEASING.md)
-- [Cài đặt và cấu hình chung](docs/INSTALLATION.md)
-- [Vận hành production và xử lý sự cố](docs/OPERATIONS.md)
-- [Chính sách hỗ trợ và mẫu ticket](SUPPORT.md)
-- [Brand và cách ghi nhận thương hiệu](BRAND.md)
-- [Báo cáo lỗ hổng bảo mật](SECURITY.md)
-- [Đóng góp và kiểm tra thay đổi](CONTRIBUTING.md)
+- [CI/CD, đóng gói ZIP và phát hành module](docs/RELEASING.vi.md) | [English](docs/RELEASING.md)
+- [Cài đặt và cấu hình chung](docs/INSTALLATION.vi.md) | [English](docs/INSTALLATION.md)
+- [Vận hành production và xử lý sự cố](docs/OPERATIONS.vi.md) | [English](docs/OPERATIONS.md)
+- [Chính sách hỗ trợ và mẫu ticket](SUPPORT.vi.md) | [English](SUPPORT.md)
+- [Thương hiệu và ghi nhận nguồn gốc](BRAND.vi.md) | [English](BRAND.md)
+- [Báo cáo lỗ hổng bảo mật](SECURITY.vi.md) | [English](SECURITY.md)
+- [Đóng góp và kiểm tra thay đổi](CONTRIBUTING.vi.md) | [English](CONTRIBUTING.md)
 - [Giấy phép MIT](LICENSE)
 
 ## Yêu cầu và lưu ý

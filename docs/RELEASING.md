@@ -1,5 +1,7 @@
 # CI, Packages, and Releases
 
+[English](RELEASING.md) | [Tiếng Việt](RELEASING.vi.md)
+
 ## Package layout
 
 Each module is built and published independently. The ZIP contains the module under its HostBill-relative destination, with no extra archive wrapper:
@@ -36,16 +38,16 @@ webnic_ssl-v<exact module version>
 Examples for the current source metadata:
 
 ```text
-webnic_domain-v1.2026-11-03.1
-webnic_dns-v1.1.1
-webnic_ssl-v1.1.1
+webnic_domain-v1.2026-11-04.1
+webnic_dns-v1.1.2
+webnic_ssl-v1.1.2
 ```
 
 Before tagging, update the selected module's `$version` in its main PHP class, review the module README/changelog and license, and merge the change to the default branch. Create and push a tag that exactly matches that version:
 
 ```sh
-git tag webnic_dns-v1.1.1
-git push origin webnic_dns-v1.1.1
+git tag webnic_dns-v1.1.2
+git push origin webnic_dns-v1.1.2
 ```
 
 Replace the example with the new module and version. The tag must point at the reviewed commit. The workflow verifies the tag's module and version against the source, runs PHP and JSON checks, builds and validates one module ZIP, then creates a GitHub Release with that ZIP attached. A DNS release does not publish new Domain or SSL assets.
