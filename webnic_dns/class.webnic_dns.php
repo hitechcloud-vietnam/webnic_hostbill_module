@@ -31,7 +31,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.1.0
+ * @version   1.1.1
  */
 #[\AllowDynamicProperties]
 class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
@@ -47,7 +47,16 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
      * Module version. Increase on every method change.
      * @var string
      */
-    protected $version = "1.1.0";
+    protected $version = "1.1.1";
+
+    /**
+     * Negative-cache marker + TTL (seconds) set after a transport failure, so
+     * repeated admin renders fast-fail instead of each waiting out a fresh
+     * connect timeout against an unreachable WebNIC host.
+     */
+    const DOWN_CACHE_KEY = "webnic_dns.down";
+    const DOWN_CACHE_TTL = 45;
+    const DOWN_MESSAGE = "Could not reach WebNIC API — check API credentials and that this server's outbound IP is whitelisted at WebNIC.";
 
     protected $_repository = "hosting_webnic_dns";
 
@@ -305,6 +314,13 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
                 $this->token = $cached;
                 return true;
             }
+            // Fast-fail while a recent transport failure is still cached so the
+            // zone/record/product admin pages do not each wait out a fresh
+            // connect timeout against an unreachable WebNIC host.
+            if (HBCache::get(self::DOWN_CACHE_KEY)) {
+                $this->addError(self::DOWN_MESSAGE);
+                return false;
+            }
         }
         $endpoint = $this->isLive() ? $this->tokenEndpoints["live"] : $this->tokenEndpoints["test"];
         $payload = [
@@ -314,18 +330,31 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $endpoint);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 90);
+        // Bound the connect phase and the whole token call so an unreachable
+        // WebNIC host (IP not whitelisted / firewall) cannot freeze the page.
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($curl, CURLOPT_NOSIGNAL, 1);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 20);
         curl_setopt($curl, CURLOPT_POST, true);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
         curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($payload));
         $out = curl_exec($curl);
+        $cerr = curl_error($curl);
         curl_close($curl);
+        if ($out === false) {
+            // Transport failure (connect timeout / DNS / TLS): negative-cache it
+            // briefly and surface a clear, actionable message instead of hanging.
+            HBCache::set(self::DOWN_CACHE_KEY, 1, self::DOWN_CACHE_TTL);
+            $this->addError(self::DOWN_MESSAGE . " (" . ucwords($cerr) . ")");
+            return false;
+        }
         $resp = json_decode($out, true);
         HBDebug::debug("WebNIC DNS token", ["resp" => $resp]);
         if (is_array($resp) && (string) ($resp["code"] ?? "") === "1000" && !empty($resp["data"]["access_token"])) {
             $this->token = $resp["data"]["access_token"];
             $ttl = isset($resp["data"]["expires_in"]) ? (int) $resp["data"]["expires_in"] : 3600;
             HBCache::set("webnic_dns", $this->token, $ttl);
+            HBCache::delete(self::DOWN_CACHE_KEY);
             return true;
         }
         $this->addError("WebNIC authentication failed: " . $this->errMsg($resp));
@@ -348,7 +377,11 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 90);
+        // Bound the connect phase and the whole interactive call so an
+        // unreachable WebNIC host cannot freeze the zone/record admin page.
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($curl, CURLOPT_NOSIGNAL, 1);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($curl, CURLOPT_HTTPHEADER, [
             "Content-Type: application/json",
@@ -363,8 +396,11 @@ class webnic_dns extends DNSModule implements ReverseDNS, DNSSECModule
         $err = curl_error($curl);
         curl_close($curl);
         if ($out === false) {
+            // Transport failure: negative-cache briefly so repeated renders
+            // fast-fail instead of each incurring a fresh connect timeout.
+            HBCache::set(self::DOWN_CACHE_KEY, 1, self::DOWN_CACHE_TTL);
             if ($show_error) {
-                $this->addError("WebNIC request error: " . ucwords($err));
+                $this->addError(self::DOWN_MESSAGE . " (" . ucwords($err) . ")");
             }
             return false;
         }
