@@ -23,7 +23,7 @@
  * @author    HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @copyright 2026 HiTechCloud by Pho Tue SoftWare Solutions JSC
  * @license   MIT
- * @version   1.2026-11-02.2
+ * @version   1.2026-11-03.1
  */
 
 use Domain\webnic_domain\ORM\ORM_domcontacts as DContacts;
@@ -58,7 +58,7 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
      * Module version. Bump on every feature change so HostBill re-reads the contract.
      * @var string
      */
-    protected $version = '1.2026-11-02.2';
+    protected $version = '1.2026-11-03.1';
 
     /**
      * Module name, visible in admin portal.
@@ -234,7 +234,15 @@ class webnic_domain extends DomainModule implements Observer, DomainLookupInterf
      */
     protected function init()
     {
-        $this->http = new Client();
+        // Bound the connect phase and the overall request so an unreachable
+        // WebNIC host (IP not whitelisted / firewall dropping outbound) cannot
+        // freeze the admin UI on price/lookup/product calls. Guzzle defaults to
+        // no timeout at all, so these must be set explicitly. All API traffic
+        // flows through this client, so the defaults cover every call.
+        $this->http = new Client([
+            'connect_timeout' => 10,
+            'timeout'         => 30,
+        ]);
     }
 
     /* =====================================================================
